@@ -1,0 +1,108 @@
+unit ConfereArquivo.Json;
+
+interface
+
+uses
+  System.JSON, System.SysUtils, System.DateUtils,
+  ConfereArquivo.Types;
+
+function BuildNFCeJson(const AEmpresa: TConfereEmpresaInfo;
+  const ARecord: TConfereNFCeRecord): TJSONObject;
+function BuildLoteJson(const ACNPJ, AInstalacaoID: string;
+  const AItems: TArray<TConfereQueueItem>): TJSONObject;
+
+implementation
+
+function JsonDateOrNull(const AValue: TDateTime): TJSONValue;
+begin
+  if AValue <= 0 then
+    Exit(TJSONNull.Create);
+
+  Result := TJSONString.Create(FormatDateTime('yyyy"-"mm"-"dd', AValue));
+end;
+
+function JsonNumberOrZero(const AValue: Currency): TJSONNumber;
+begin
+  Result := TJSONNumber.Create(StringReplace(FormatFloat('0.######', AValue), ',', '.', [rfReplaceAll]));
+end;
+
+function BuildNFCeJson(const AEmpresa: TConfereEmpresaInfo;
+  const ARecord: TConfereNFCeRecord): TJSONObject;
+begin
+  Result := TJSONObject.Create;
+  Result.AddPair('payload_version', TJSONNumber.Create(1));
+  Result.AddPair('empresa', TJSONObject.Create
+    .AddPair('id_ecf_empresa', TJSONNumber.Create(AEmpresa.IDEmpresaECF))
+    .AddPair('id_empresa_erp', TJSONNumber.Create(AEmpresa.IDEmpresaERP))
+    .AddPair('cnpj', NormalizeDigits(AEmpresa.CNPJ))
+    .AddPair('razao_social', AEmpresa.RazaoSocial)
+    .AddPair('nome_fantasia', AEmpresa.NomeFantasia)
+    .AddPair('inscricao_estadual', NormalizeDigits(AEmpresa.InscricaoEstadual))
+    .AddPair('crt', AEmpresa.CRT)
+    .AddPair('tipo_regime', AEmpresa.TipoRegime)
+    .AddPair('cidade', AEmpresa.Cidade)
+    .AddPair('uf', AEmpresa.UF)
+    .AddPair('codigo_ibge_cidade', TJSONNumber.Create(AEmpresa.CodigoIBGECidade)));
+
+  Result.AddPair('venda', TJSONObject.Create
+    .AddPair('source_id', TJSONNumber.Create(ARecord.SourceID))
+    .AddPair('id_ecf_movimento', TJSONNumber.Create(ARecord.IDECFMovimento))
+    .AddPair('data_venda', JsonDateOrNull(ARecord.DataVenda))
+    .AddPair('hora_venda', ARecord.HoraVenda)
+    .AddPair('status_venda', ARecord.StatusVenda)
+    .AddPair('num_nfce', TJSONNumber.Create(ARecord.NumeroNFCe))
+    .AddPair('serie_nfce', TJSONNumber.Create(ARecord.SerieNFCe))
+    .AddPair('chave_acesso', ARecord.ChaveAcesso)
+    .AddPair('protocolo', ARecord.Protocolo)
+    .AddPair('nfce_cancelada', ARecord.NFCeCancelada)
+    .AddPair('nfce_offline', ARecord.NFCeOffline)
+    .AddPair('codigo_numerico_nfce', TJSONNumber.Create(ARecord.CodigoNumerico))
+    .AddPair('caminho_xml', ARecord.CaminhoXML)
+    .AddPair('sat_xml', ARecord.SatXML)
+    .AddPair('emitiu_sat', ARecord.EmitiuSAT)
+    .AddPair('num_sat', TJSONNumber.Create(ARecord.NumSAT))
+    .AddPair('status_erro', ARecord.StatusErro)
+    .AddPair('dhcont', ARecord.DHCont)
+    .AddPair('data_autorizacao', JsonDateOrNull(ARecord.DataAutorizacao))
+    .AddPair('valor_venda', JsonNumberOrZero(ARecord.ValorVenda))
+    .AddPair('valor_final', JsonNumberOrZero(ARecord.ValorFinal))
+    .AddPair('total_produtos', JsonNumberOrZero(ARecord.TotalProdutos))
+    .AddPair('total_documento', JsonNumberOrZero(ARecord.TotalDocumento))
+    .AddPair('base_icms', JsonNumberOrZero(ARecord.BaseICMS))
+    .AddPair('icms', JsonNumberOrZero(ARecord.ICMS))
+    .AddPair('pis', JsonNumberOrZero(ARecord.PIS))
+    .AddPair('cofins', JsonNumberOrZero(ARecord.COFINS))
+    .AddPair('imposto', JsonNumberOrZero(ARecord.Imposto))
+    .AddPair('imposto_estadual', JsonNumberOrZero(ARecord.ImpostoEstadual))
+    .AddPair('documento_cliente', NormalizeDigits(ARecord.DocumentoCliente))
+    .AddPair('nome_cliente', ARecord.NomeCliente)
+    .AddPair('hash_incremento', TJSONNumber.Create(ARecord.HashIncremento))
+    .AddPair('status_operacional', ConfereStatusToString(ARecord.StatusOperacional)));
+end;
+
+function BuildLoteJson(const ACNPJ, AInstalacaoID: string;
+  const AItems: TArray<TConfereQueueItem>): TJSONObject;
+var
+  Arr: TJSONArray;
+  Item: TConfereQueueItem;
+  Parsed: TJSONValue;
+begin
+  Arr := TJSONArray.Create;
+  for Item in AItems do
+  begin
+    Parsed := TJSONObject.ParseJSONValue(Item.PayloadJson);
+    if Assigned(Parsed) then
+      Arr.AddElement(Parsed)
+    else
+      Arr.AddElement(TJSONObject.Create.AddPair('source_id', TJSONNumber.Create(Item.SourceID)));
+  end;
+
+  Result := TJSONObject.Create;
+  Result.AddPair('cnpj_empresa', NormalizeDigits(ACNPJ));
+  Result.AddPair('instalacao_id', AInstalacaoID);
+  Result.AddPair('gerado_em', DateToISO8601(Now, False));
+  Result.AddPair('quantidade', TJSONNumber.Create(Length(AItems)));
+  Result.AddPair('notas', Arr);
+end;
+
+end.
