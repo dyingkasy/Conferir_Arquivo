@@ -160,6 +160,122 @@ func (p *Postgres) SaveLote(ctx context.Context, lote model.LoteRequest, token, 
 	return tx.Commit(ctx)
 }
 
+func (p *Postgres) GetResumo(ctx context.Context, cnpj, token string, dias int) (model.ResumoResponse, error) {
+	if dias <= 0 {
+		dias = 7
+	}
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return model.ResumoResponse{}, err
+	}
+
+	var resp model.ResumoResponse
+	resp.CNPJEmpresa = cnpj
+	err := p.pool.QueryRow(ctx, `
+		select
+			count(*)::bigint,
+			count(*) filter (where status_operacional = 'AUTORIZADA')::bigint,
+			count(*) filter (where status_operacional in ('CONTINGENCIA', 'CONTINGENCIA_AUTORIZADA', 'CONTINGENCIA_PENDENTE'))::bigint,
+			count(*) filter (where status_operacional in ('PENDENTE_TRANSMISSAO', 'CONTINGENCIA_PENDENTE'))::bigint,
+			count(*) filter (where status_operacional = 'REJEITADA')::bigint,
+			count(*) filter (where status_operacional = 'CANCELADA')::bigint,
+			coalesce(sum(total_documento), 0)::float8,
+			coalesce(sum(case when status_operacional in ('CONTINGENCIA', 'CONTINGENCIA_AUTORIZADA', 'CONTINGENCIA_PENDENTE') then total_documento else 0 end), 0)::float8,
+			coalesce(sum(case when status_operacional in ('PENDENTE_TRANSMISSAO', 'CONTINGENCIA_PENDENTE') then total_documento else 0 end), 0)::float8
+		from nfce_cabecalho_espelho
+		where cnpj_empresa = $1
+		  and coalesce(data_venda, current_date) >= current_date - ($2::int)
+	`, cnpj, dias).Scan(
+		&resp.QuantidadeTotal,
+		&resp.QuantidadeAutorizada,
+		&resp.QuantidadeContingencia,
+		&resp.QuantidadePendente,
+		&resp.QuantidadeRejeitada,
+		&resp.QuantidadeCancelada,
+		&resp.ValorTotalDocumento,
+		&resp.ValorTotalContingencia,
+		&resp.ValorTotalPendente,
+	)
+	return resp, err
+}
+
+func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicial, dataFinal string, limit int) ([]model.NFCeListItem, error) {
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+
+	baseSQL := `
+		select source_id, instalacao_id, data_venda, hora_venda, num_nfce, serie_nfce, chave_acesso, protocolo,
+		       status_operacional, status_erro, nfce_offline, nfce_cancelada, total_documento, nome_cliente, documento_cliente
+		from nfce_cabecalho_espelho
+		where cnpj_empresa = $1
+	`
+	args := []any{cnpj}
+	argPos := 2
+
+	if strings.TrimSpace(status) != "" {
+		baseSQL += fmt.Sprintf(" and status_operacional = $%d", argPos)
+		args = append(args, strings.TrimSpace(status))
+		argPos++
+	}
+	if strings.TrimSpace(dataInicial) != "" {
+		baseSQL += fmt.Sprintf(" and data_venda >= $%d", argPos)
+		args = append(args, dataInicial)
+		argPos++
+	}
+	if strings.TrimSpace(dataFinal) != "" {
+		baseSQL += fmt.Sprintf(" and data_venda <= $%d", argPos)
+		args = append(args, dataFinal)
+		argPos++
+	}
+
+	baseSQL += fmt.Sprintf(" order by coalesce(data_venda, current_date) desc, source_id desc limit $%d", argPos)
+	args = append(args, limit)
+
+	rows, err := p.pool.Query(ctx, baseSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.NFCeListItem, 0, limit)
+	for rows.Next() {
+		var item model.NFCeListItem
+		var dataVenda *time.Time
+		var valorDoc *float64
+		if err := rows.Scan(
+			&item.SourceID,
+			&item.InstalacaoID,
+			&dataVenda,
+			&item.HoraVenda,
+			&item.NumeroNFCe,
+			&item.SerieNFCe,
+			&item.ChaveAcesso,
+			&item.Protocolo,
+			&item.StatusOperacional,
+			&item.StatusErro,
+			&item.NFCeOffline,
+			&item.NFCeCancelada,
+			&valorDoc,
+			&item.NomeCliente,
+			&item.DocumentoCliente,
+		); err != nil {
+			return nil, err
+		}
+		if dataVenda != nil {
+			v := dataVenda.Format("2006-01-02")
+			item.DataVenda = &v
+		}
+		item.ValorDocumento = valorDoc
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func (p *Postgres) saveHeartbeatTx(ctx context.Context, tx pgx.Tx, cnpj, instalacaoID, remoteIP string) error {
 	_, err := tx.Exec(ctx, `
 		insert into agente_instalacao (

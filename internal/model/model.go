@@ -30,6 +30,37 @@ type Tenant struct {
 	RazaoSocial string
 }
 
+type ResumoResponse struct {
+	CNPJEmpresa               string  `json:"cnpj_empresa"`
+	QuantidadeTotal           int64   `json:"quantidade_total"`
+	QuantidadeAutorizada      int64   `json:"quantidade_autorizada"`
+	QuantidadeContingencia    int64   `json:"quantidade_contingencia"`
+	QuantidadePendente        int64   `json:"quantidade_pendente"`
+	QuantidadeRejeitada       int64   `json:"quantidade_rejeitada"`
+	QuantidadeCancelada       int64   `json:"quantidade_cancelada"`
+	ValorTotalDocumento       float64 `json:"valor_total_documento"`
+	ValorTotalContingencia    float64 `json:"valor_total_contingencia"`
+	ValorTotalPendente        float64 `json:"valor_total_pendente"`
+}
+
+type NFCeListItem struct {
+	SourceID          int32    `json:"source_id"`
+	InstalacaoID      string   `json:"instalacao_id"`
+	DataVenda         *string  `json:"data_venda,omitempty"`
+	HoraVenda         string   `json:"hora_venda"`
+	NumeroNFCe        *int32   `json:"num_nfce,omitempty"`
+	SerieNFCe         *int32   `json:"serie_nfce,omitempty"`
+	ChaveAcesso       string   `json:"chave_acesso"`
+	Protocolo         string   `json:"protocolo"`
+	StatusOperacional string   `json:"status_operacional"`
+	StatusErro        string   `json:"status_erro"`
+	NFCeOffline       string   `json:"nfce_offline"`
+	NFCeCancelada     string   `json:"nfce_cancelada"`
+	ValorDocumento    *float64 `json:"valor_documento,omitempty"`
+	NomeCliente       string   `json:"nome_cliente"`
+	DocumentoCliente  string   `json:"documento_cliente"`
+}
+
 type NotaPayload struct {
 	Empresa           map[string]any `json:"empresa"`
 	Venda             map[string]any `json:"venda"`

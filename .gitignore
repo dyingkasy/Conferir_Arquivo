@@ -2,6 +2,9 @@ AgenteLocal/
 ApiVps/Bin/
 ApiVps/Logs/
 ApiVps/Config/
+PainelEmpresa/Bin/
+PainelEmpresa/Logs/
+PainelEmpresa/Config/
 *.dcu
 *.ddp
 *.ppu

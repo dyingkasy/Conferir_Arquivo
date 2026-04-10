@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -128,6 +129,55 @@ func (h *Handler) Lote(w http.ResponseWriter, r *http.Request) {
 		"status":     "ok",
 		"mensagem":   "Lote recebido e persistido.",
 		"quantidade": req.Quantidade,
+	})
+}
+
+func (h *Handler) Resumo(w http.ResponseWriter, r *http.Request) {
+	token := auth.BearerToken(r.Header.Get("Authorization"))
+	cnpj := model.NormalizeDigits(r.URL.Query().Get("cnpj_empresa"))
+	dias := 7
+	if value := strings.TrimSpace(r.URL.Query().Get("dias")); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			dias = parsed
+		}
+	}
+	if cnpj == "" || token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
+		return
+	}
+	resp, err := h.store.GetResumo(r.Context(), cnpj, token, dias)
+	if err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) Lista(w http.ResponseWriter, r *http.Request) {
+	token := auth.BearerToken(r.Header.Get("Authorization"))
+	cnpj := model.NormalizeDigits(r.URL.Query().Get("cnpj_empresa"))
+	status := strings.TrimSpace(r.URL.Query().Get("status_operacional"))
+	dataInicial := strings.TrimSpace(r.URL.Query().Get("data_inicial"))
+	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
+	limit := 200
+	if value := strings.TrimSpace(r.URL.Query().Get("limit")); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			limit = parsed
+		}
+	}
+	if cnpj == "" || token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
+		return
+	}
+	items, err := h.store.ListNFCe(r.Context(), cnpj, token, status, dataInicial, dataFinal, limit)
+	if err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "ok",
+		"quantidade": len(items),
+		"items":      items,
 	})
 }
 
