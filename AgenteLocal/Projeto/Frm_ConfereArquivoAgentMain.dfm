@@ -2,8 +2,8 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
   Left = 0
   Top = 0
   Caption = 'Confere Arquivo - Agente Local'
-  ClientHeight = 720
-  ClientWidth = 1080
+  ClientHeight = 700
+  ClientWidth = 1060
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -12,8 +12,10 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
   Font.Style = []
   OldCreateOrder = False
   Position = poScreenCenter
+  OnClose = FormClose
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 17
   object pnlHeader: TPanel
@@ -56,8 +58,8 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
   object gbOrigem: TGroupBox
     Left = 16
     Top = 104
-    Width = 521
-    Height = 153
+    Width = 510
+    Height = 145
     Caption = 'Origem Firebird'
     TabOrder = 1
     object lblBanco: TLabel
@@ -84,7 +86,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object edBanco: TEdit
       Left = 16
       Top = 52
-      Width = 489
+      Width = 478
       Height = 25
       TabOrder = 0
     end
@@ -98,17 +100,17 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object edSenha: TEdit
       Left = 265
       Top = 108
-      Width = 240
+      Width = 229
       Height = 25
       PasswordChar = '*'
       TabOrder = 2
     end
   end
   object gbServidor: TGroupBox
-    Left = 553
+    Left = 538
     Top = 104
-    Width = 511
-    Height = 153
+    Width = 506
+    Height = 145
     Caption = 'Servidor VPS'
     TabOrder = 2
     object lblApiUrl: TLabel
@@ -135,7 +137,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object edApiUrl: TEdit
       Left = 16
       Top = 52
-      Width = 479
+      Width = 474
       Height = 25
       TabOrder = 0
     end
@@ -149,16 +151,16 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object edInstalacao: TEdit
       Left = 265
       Top = 108
-      Width = 230
+      Width = 225
       Height = 25
       TabOrder = 2
     end
   end
   object gbAgente: TGroupBox
     Left = 16
-    Top = 273
-    Width = 1048
-    Height = 121
+    Top = 261
+    Width = 1028
+    Height = 116
     Caption = 'Controle do Agente'
     TabOrder = 3
     object lblIntervalo: TLabel
@@ -245,7 +247,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object btnIniciar: TButton
       Left = 925
       Top = 22
-      Width = 104
+      Width = 88
       Height = 28
       Caption = 'Iniciar'
       TabOrder = 7
@@ -254,7 +256,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object btnParar: TButton
       Left = 925
       Top = 56
-      Width = 104
+      Width = 88
       Height = 28
       Caption = 'Parar'
       TabOrder = 8
@@ -281,9 +283,9 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
   end
   object gbMonitor: TGroupBox
     Left = 16
-    Top = 410
-    Width = 1048
-    Height = 294
+    Top = 389
+    Width = 1028
+    Height = 295
     Caption = 'Monitor de Operacao'
     TabOrder = 4
     object lblEmpresa: TLabel
@@ -317,7 +319,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object edEmpresa: TEdit
       Left = 16
       Top = 53
-      Width = 521
+      Width = 505
       Height = 25
       ReadOnly = True
       TabOrder = 0
@@ -333,13 +335,13 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object edUltimaMensagem: TEdit
       Left = 16
       Top = 103
-      Width = 1013
+      Width = 997
       Height = 25
       ReadOnly = True
       TabOrder = 2
     end
     object edUltimaLeitura: TEdit
-      Left = 846
+      Left = 830
       Top = 53
       Width = 183
       Height = 25
@@ -349,11 +351,23 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object mmEventos: TMemo
       Left = 16
       Top = 144
-      Width = 1013
+      Width = 997
       Height = 129
       ReadOnly = True
       ScrollBars = ssVertical
       TabOrder = 4
+    end
+  end
+  object TrayPopup: TPopupMenu
+    Left = 952
+    Top = 16
+    object miAbrir: TMenuItem
+      Caption = 'Abrir'
+      OnClick = miAbrirClick
+    end
+    object miSair: TMenuItem
+      Caption = 'Sair'
+      OnClick = miSairClick
     end
   end
   object tmrAgente: TTimer

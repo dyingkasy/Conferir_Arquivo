@@ -4,7 +4,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, Winapi.ShellAPI, System.SysUtils, System.Classes, System.Math,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.Menus,
   ConfereArquivo.Agent.Config, ConfereArquivo.Agent.Sync;
 
 type
@@ -52,8 +52,13 @@ type
     edUltimaLeitura: TEdit;
     mmEventos: TMemo;
     tmrAgente: TTimer;
+    TrayPopup: TPopupMenu;
+    miAbrir: TMenuItem;
+    miSair: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormResize(Sender: TObject);
     procedure btnSalvarClick(Sender: TObject);
     procedure btnValidarBancoClick(Sender: TObject);
     procedure btnValidarApiClick(Sender: TObject);
@@ -64,10 +69,25 @@ type
     procedure btnAbrirLogsClick(Sender: TObject);
     procedure btnTestarTudoClick(Sender: TObject);
     procedure tmrAgenteTimer(Sender: TObject);
+    procedure miAbrirClick(Sender: TObject);
+    procedure miSairClick(Sender: TObject);
+  private
+    const WM_TRAYICON = WM_USER + 101;
   private
     FConfig: TConfereAgentConfig;
     FEngine: TConfereSyncEngine;
     FBusy: Boolean;
+    FForceExit: Boolean;
+    FTrayData: TNotifyIconData;
+    procedure ApplyVisualStyle;
+    procedure StyleReadOnlyEdit(AEdit: TEdit; const AColor: TColor);
+    procedure StyleButton(AButton: TButton);
+    procedure AddTrayIcon;
+    procedure RemoveTrayIcon;
+    procedure ShowTrayBalloon(const ATitle, AText: string);
+    procedure HideToTray(const AMessage: string);
+    procedure ShowFromTray;
+    procedure WMTrayIcon(var Msg: TMessage); message WM_TRAYICON;
     procedure LoadScreen;
     procedure SaveScreenToConfig;
     procedure RecreateEngine;
@@ -94,13 +114,133 @@ begin
   LoadAgentConfig(FConfig);
   ConfigureConfereLogger(FConfig.LogPath);
   LoadScreen;
+  ApplyVisualStyle;
   RecreateEngine;
+  AddTrayIcon;
   AppendEvent('Agente carregado.');
 end;
 
 procedure TFrmConfereArquivoAgentMain.FormDestroy(Sender: TObject);
 begin
+  RemoveTrayIcon;
   FreeAndNil(FEngine);
+end;
+
+procedure TFrmConfereArquivoAgentMain.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  if FForceExit then
+    Exit;
+  Action := caNone;
+  HideToTray('O agente continua ativo na bandeja do Windows.');
+end;
+
+procedure TFrmConfereArquivoAgentMain.FormResize(Sender: TObject);
+begin
+  if WindowState = wsMinimized then
+    HideToTray('O agente foi minimizado para a bandeja.');
+end;
+
+procedure TFrmConfereArquivoAgentMain.StyleReadOnlyEdit(AEdit: TEdit; const AColor: TColor);
+begin
+  AEdit.Color := AColor;
+  AEdit.Font.Color := $00342E25;
+  AEdit.Font.Style := [fsBold];
+  AEdit.ReadOnly := True;
+end;
+
+procedure TFrmConfereArquivoAgentMain.StyleButton(AButton: TButton);
+begin
+  AButton.Font.Style := [fsBold];
+end;
+
+procedure TFrmConfereArquivoAgentMain.ApplyVisualStyle;
+begin
+  Color := $00F4F6F8;
+  gbOrigem.Font.Style := [fsBold];
+  gbServidor.Font.Style := [fsBold];
+  gbAgente.Font.Style := [fsBold];
+  gbMonitor.Font.Style := [fsBold];
+  StyleButton(btnSalvar);
+  StyleButton(btnValidarBanco);
+  StyleButton(btnValidarApi);
+  StyleButton(btnColetarAgora);
+  StyleButton(btnSyncTotal);
+  StyleButton(btnIniciar);
+  StyleButton(btnParar);
+  StyleButton(btnAbrirLogs);
+  StyleButton(btnTestarTudo);
+  StyleReadOnlyEdit(edEmpresa, $00EAF0F7);
+  StyleReadOnlyEdit(edPendentes, $00FFF0D9);
+  StyleReadOnlyEdit(edUltimaMensagem, $00F2F4F7);
+  StyleReadOnlyEdit(edUltimaLeitura, $00E6F5E8);
+  mmEventos.Color := clWhite;
+  mmEventos.Font.Name := 'Consolas';
+  mmEventos.Font.Height := -11;
+end;
+
+procedure TFrmConfereArquivoAgentMain.AddTrayIcon;
+begin
+  ZeroMemory(@FTrayData, SizeOf(FTrayData));
+  FTrayData.cbSize := SizeOf(FTrayData);
+  FTrayData.Wnd := Handle;
+  FTrayData.uID := 1;
+  FTrayData.uFlags := NIF_MESSAGE or NIF_ICON or NIF_TIP;
+  FTrayData.uCallbackMessage := WM_TRAYICON;
+  FTrayData.hIcon := Application.Icon.Handle;
+  StrPLCopy(FTrayData.szTip, 'Confere Arquivo - Agente Local', Length(FTrayData.szTip) - 1);
+  Shell_NotifyIcon(NIM_ADD, @FTrayData);
+end;
+
+procedure TFrmConfereArquivoAgentMain.RemoveTrayIcon;
+begin
+  if FTrayData.Wnd <> 0 then
+    Shell_NotifyIcon(NIM_DELETE, @FTrayData);
+  ZeroMemory(@FTrayData, SizeOf(FTrayData));
+end;
+
+procedure TFrmConfereArquivoAgentMain.ShowTrayBalloon(const ATitle,
+  AText: string);
+begin
+  if FTrayData.Wnd = 0 then
+    Exit;
+  FTrayData.uFlags := NIF_INFO;
+  StrPLCopy(FTrayData.szInfoTitle, ATitle, Length(FTrayData.szInfoTitle) - 1);
+  StrPLCopy(FTrayData.szInfo, AText, Length(FTrayData.szInfo) - 1);
+  FTrayData.dwInfoFlags := NIIF_INFO;
+  Shell_NotifyIcon(NIM_MODIFY, @FTrayData);
+  FTrayData.uFlags := NIF_MESSAGE or NIF_ICON or NIF_TIP;
+end;
+
+procedure TFrmConfereArquivoAgentMain.HideToTray(const AMessage: string);
+begin
+  Hide;
+  if AMessage <> '' then
+    ShowTrayBalloon('Confere Arquivo', AMessage);
+end;
+
+procedure TFrmConfereArquivoAgentMain.ShowFromTray;
+begin
+  Show;
+  WindowState := wsNormal;
+  Application.Restore;
+  SetForegroundWindow(Handle);
+end;
+
+procedure TFrmConfereArquivoAgentMain.WMTrayIcon(var Msg: TMessage);
+var
+  Pt: TPoint;
+begin
+  case Msg.LParam of
+    WM_LBUTTONDBLCLK:
+      ShowFromTray;
+    WM_RBUTTONUP:
+      begin
+        SetForegroundWindow(Handle);
+        GetCursorPos(Pt);
+        TrayPopup.Popup(Pt.X, Pt.Y);
+      end;
+  end;
 end;
 
 procedure TFrmConfereArquivoAgentMain.LoadScreen;
@@ -293,6 +433,18 @@ end;
 procedure TFrmConfereArquivoAgentMain.tmrAgenteTimer(Sender: TObject);
 begin
   RunPoll;
+end;
+
+procedure TFrmConfereArquivoAgentMain.miAbrirClick(Sender: TObject);
+begin
+  ShowFromTray;
+end;
+
+procedure TFrmConfereArquivoAgentMain.miSairClick(Sender: TObject);
+begin
+  FForceExit := True;
+  tmrAgente.Enabled := False;
+  Close;
 end;
 
 end.
