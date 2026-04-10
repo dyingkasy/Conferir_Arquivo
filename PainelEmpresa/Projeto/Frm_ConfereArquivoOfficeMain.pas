@@ -38,6 +38,7 @@ type
     edDias: TEdit;
     btnConsultar: TButton;
     gbResumo: TGroupBox;
+    gbTributos: TGroupBox;
     lblTotal: TLabel;
     lblTransmitidas: TLabel;
     lblContingencia: TLabel;
@@ -85,6 +86,9 @@ type
     FConfig: TConfereOfficeConfig;
     FEmpresas: TArray<TConfereEmpresaDisponivel>;
     FVisibleEmpresas: TArray<Integer>;
+    procedure ApplyVisualStyle;
+    procedure StyleReadOnlyEdit(AEdit: TEdit; const AColor: TColor);
+    procedure StyleButton(AButton: TButton; const AColor: TColor; AFontColor: TColor = clWhite);
     procedure LoadScreen;
     procedure SaveScreen;
     procedure ApplyGridHeader;
@@ -112,6 +116,7 @@ begin
   LoadOfficeConfig(FConfig);
   ConfigureConfereLogger(FConfig.LogPath);
   LoadScreen;
+  ApplyVisualStyle;
   ApplyGridHeader;
   try
     LoadEmpresas;
@@ -119,6 +124,75 @@ begin
     on E: Exception do
       Log('Falha carregando empresas: ' + E.Message);
   end;
+end;
+
+procedure TFrmConfereArquivoOfficeMain.StyleReadOnlyEdit(AEdit: TEdit; const AColor: TColor);
+begin
+  AEdit.Color := AColor;
+  AEdit.Font.Color := $00342E25;
+  AEdit.Font.Style := [fsBold];
+  AEdit.ReadOnly := True;
+  AEdit.ParentColor := False;
+end;
+
+procedure TFrmConfereArquivoOfficeMain.StyleButton(AButton: TButton; const AColor: TColor; AFontColor: TColor);
+begin
+  AButton.Tag := AColor;
+  AButton.Font.Color := AFontColor;
+  AButton.Font.Style := [fsBold];
+end;
+
+procedure TFrmConfereArquivoOfficeMain.ApplyVisualStyle;
+var
+  I: Integer;
+begin
+  Color := $00F4F6F8;
+  pnlLeft.Color := $00F0F3F7;
+  pnlLeft.ParentBackground := False;
+  pnlConteudo.Color := $00F8FAFC;
+  pnlConteudo.ParentBackground := False;
+
+  gbConexao.Font.Style := [fsBold];
+  gbEmpresas.Font.Style := [fsBold];
+  gbFiltros.Font.Style := [fsBold];
+  gbResumo.Font.Style := [fsBold];
+  gbTributos.Font.Style := [fsBold];
+
+  StyleButton(btnSalvar, $003A6EA5);
+  StyleButton(btnHealth, $004A8A4A);
+  StyleButton(btnEmpresas, $006A7680);
+  StyleButton(btnConsultar, $003A6EA5);
+
+  for I := 0 to ComponentCount - 1 do
+    if Components[I] is TEdit then
+      (Components[I] as TEdit).Font.Name := 'Segoe UI';
+
+  StyleReadOnlyEdit(edTotal, $00F2F4F7);
+  StyleReadOnlyEdit(edTransmitidas, $00E6F5E8);
+  StyleReadOnlyEdit(edContingencia, $00FFF0D9);
+  StyleReadOnlyEdit(edSemFiscal, $00FBE7D8);
+  StyleReadOnlyEdit(edRejeitadas, $00FCE4E4);
+  StyleReadOnlyEdit(edCanceladas, $00F1E6EA);
+  StyleReadOnlyEdit(edValorTotal, $00F2F4F7);
+  StyleReadOnlyEdit(edValorTransmitido, $00E6F5E8);
+  StyleReadOnlyEdit(edValorCont, $00FFF0D9);
+  StyleReadOnlyEdit(edValorSemFiscal, $00FBE7D8);
+
+  StyleReadOnlyEdit(edTribBase, $00EAF0F7);
+  StyleReadOnlyEdit(edTribICMS, $00EAF0F7);
+  StyleReadOnlyEdit(edTribPIS, $00EAF0F7);
+  StyleReadOnlyEdit(edTribCOFINS, $00EAF0F7);
+  StyleReadOnlyEdit(edTribFederal, $00EAF0F7);
+  StyleReadOnlyEdit(edTribEstadual, $00EAF0F7);
+
+  lbEmpresas.Color := clWhite;
+  lbEmpresas.Font.Name := 'Segoe UI';
+  lbEmpresas.Font.Height := -12;
+  mmLog.Color := clWhite;
+  mmLog.Font.Name := 'Consolas';
+  mmLog.Font.Height := -11;
+  sgNotas.Font.Name := 'Segoe UI';
+  sgNotas.Font.Height := -12;
 end;
 
 procedure TFrmConfereArquivoOfficeMain.LoadScreen;

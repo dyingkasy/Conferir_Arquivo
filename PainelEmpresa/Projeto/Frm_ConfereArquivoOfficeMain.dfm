@@ -263,7 +263,7 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
       Width = 940
       Height = 118
       Align = alTop
-      Caption = 'Resumo'
+      Caption = 'Resumo Operacional'
       TabOrder = 1
       object lblTotal: TLabel
         Left = 12
@@ -335,48 +335,6 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
       Height = 15
       Caption = 'Valor sem fiscal'
     end
-      object lblTribBase: TLabel
-        Left = 732
-        Top = 24
-        Width = 58
-        Height = 15
-        Caption = 'Base ICMS'
-      end
-      object lblTribICMS: TLabel
-        Left = 732
-        Top = 68
-        Width = 29
-        Height = 15
-        Caption = 'ICMS'
-      end
-      object lblTribPIS: TLabel
-        Left = 828
-        Top = 24
-        Width = 18
-        Height = 15
-        Caption = 'PIS'
-      end
-      object lblTribCOFINS: TLabel
-        Left = 828
-        Top = 68
-        Width = 42
-        Height = 15
-        Caption = 'COFINS'
-      end
-      object lblTribFederal: TLabel
-        Left = 924
-        Top = 24
-        Width = 75
-        Height = 15
-        Caption = 'Imp. Federal'
-      end
-      object lblTribEstadual: TLabel
-        Left = 924
-        Top = 68
-        Width = 80
-        Height = 15
-        Caption = 'Imp. Estadual'
-      end
       object edTotal: TEdit
         Left = 12
         Top = 40
@@ -457,53 +415,104 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         ReadOnly = True
         TabOrder = 9
       end
+    end
+    object gbTributos: TGroupBox
+      Left = 8
+      Top = 202
+      Width = 940
+      Height = 74
+      Align = alTop
+      Caption = 'Resumo Tributario'
+      TabOrder = 2
+      object lblTribBase: TLabel
+        Left = 12
+        Top = 22
+        Width = 58
+        Height = 15
+        Caption = 'Base ICMS'
+      end
+      object lblTribICMS: TLabel
+        Left = 168
+        Top = 22
+        Width = 29
+        Height = 15
+        Caption = 'ICMS'
+      end
+      object lblTribPIS: TLabel
+        Left = 324
+        Top = 22
+        Width = 18
+        Height = 15
+        Caption = 'PIS'
+      end
+      object lblTribCOFINS: TLabel
+        Left = 480
+        Top = 22
+        Width = 42
+        Height = 15
+        Caption = 'COFINS'
+      end
+      object lblTribFederal: TLabel
+        Left = 636
+        Top = 22
+        Width = 75
+        Height = 15
+        Caption = 'Imp. Federal'
+      end
+      object lblTribEstadual: TLabel
+        Left = 792
+        Top = 22
+        Width = 80
+        Height = 15
+        Caption = 'Imp. Estadual'
+      end
       object edTribBase: TEdit
-        Left = 732
-        Top = 40
-        Width = 84
+        Left = 12
+        Top = 39
+        Width = 144
         Height = 23
         ReadOnly = True
-        TabOrder = 10
+        TabOrder = 0
       end
       object edTribICMS: TEdit
-        Left = 732
-        Top = 84
-        Width = 84
+        Left = 168
+        Top = 39
+        Width = 144
         Height = 23
         ReadOnly = True
-        TabOrder = 11
+        TabOrder = 1
       end
       object edTribPIS: TEdit
-        Left = 828
-        Top = 40
-        Width = 84
+        Left = 324
+        Top = 39
+        Width = 144
         Height = 23
         ReadOnly = True
-        TabOrder = 12
+        TabOrder = 2
       end
       object edTribCOFINS: TEdit
-        Left = 828
-        Top = 84
-        Width = 84
+        Left = 480
+        Top = 39
+        Width = 144
         Height = 23
         ReadOnly = True
-        TabOrder = 13
+        TabOrder = 3
       end
       object edTribFederal: TEdit
-        Left = 924
-        Top = 40
-        Width = 84
+        Left = 636
+        Top = 39
+        Width = 144
         Height = 23
         ReadOnly = True
-        TabOrder = 14
+        TabOrder = 4
       end
       object edTribEstadual: TEdit
-        Left = 924
-        Top = 84
-        Width = 84
+        Left = 792
+        Top = 39
+        Width = 136
         Height = 23
         ReadOnly = True
-        TabOrder = 15
+        TabOrder = 5
       end
     end
     object mmLog: TMemo
@@ -518,9 +527,9 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
     end
     object sgNotas: TStringGrid
       Left = 8
-      Top = 202
+      Top = 276
       Width = 940
-      Height = 398
+      Height = 324
       Align = alClient
       ColCount = 10
       DefaultRowHeight = 21
