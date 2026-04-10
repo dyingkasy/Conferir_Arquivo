@@ -1,0 +1,24 @@
+[Unit]
+Description=ConfereArquivo API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=confereapi
+Group=confereapi
+WorkingDirectory=/opt/conferearquivo
+Environment=CONFERE_API_ENV_FILE=/etc/conferearquivo/api.env
+ExecStart=/opt/conferearquivo/bin/conferearquivo-api
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/etc/conferearquivo /opt/conferearquivo
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
