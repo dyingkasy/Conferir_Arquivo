@@ -33,13 +33,17 @@ type Tenant struct {
 type ResumoResponse struct {
 	CNPJEmpresa               string  `json:"cnpj_empresa"`
 	QuantidadeTotal           int64   `json:"quantidade_total"`
+	QuantidadeTransmitida     int64   `json:"quantidade_transmitida"`
 	QuantidadeAutorizada      int64   `json:"quantidade_autorizada"`
 	QuantidadeContingencia    int64   `json:"quantidade_contingencia"`
 	QuantidadePendente        int64   `json:"quantidade_pendente"`
+	QuantidadeSemFiscal       int64   `json:"quantidade_sem_fiscal"`
 	QuantidadeRejeitada       int64   `json:"quantidade_rejeitada"`
 	QuantidadeCancelada       int64   `json:"quantidade_cancelada"`
 	ValorTotalDocumento       float64 `json:"valor_total_documento"`
+	ValorTotalTransmitido     float64 `json:"valor_total_transmitido"`
 	ValorTotalContingencia    float64 `json:"valor_total_contingencia"`
+	ValorTotalSemFiscal       float64 `json:"valor_total_sem_fiscal"`
 	ValorTotalPendente        float64 `json:"valor_total_pendente"`
 }
 

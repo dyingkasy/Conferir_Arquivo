@@ -12,16 +12,21 @@ type
     pnlHeader: TPanel;
     lblTitulo: TLabel;
     lblSubtitulo: TLabel;
+    pnlLeft: TPanel;
     gbConexao: TGroupBox;
     lblApi: TLabel;
     lblToken: TLabel;
-    lblEmpresaSel: TLabel;
     edApi: TEdit;
     edToken: TEdit;
-    cbEmpresa: TComboBox;
     btnSalvar: TButton;
     btnHealth: TButton;
     btnEmpresas: TButton;
+    gbEmpresas: TGroupBox;
+    lblEmpresaFiltro: TLabel;
+    edEmpresaFiltro: TEdit;
+    lbEmpresas: TListBox;
+    lblQtdEmpresas: TLabel;
+    pnlConteudo: TPanel;
     gbFiltros: TGroupBox;
     lblStatus: TLabel;
     lblDataInicial: TLabel;
@@ -34,23 +39,25 @@ type
     btnConsultar: TButton;
     gbResumo: TGroupBox;
     lblTotal: TLabel;
-    lblAutorizadas: TLabel;
+    lblTransmitidas: TLabel;
     lblContingencia: TLabel;
-    lblPendentes: TLabel;
+    lblSemFiscal: TLabel;
     lblRejeitadas: TLabel;
     lblCanceladas: TLabel;
     lblValorTotal: TLabel;
+    lblValorTransmitido: TLabel;
     lblValorCont: TLabel;
-    lblValorPend: TLabel;
+    lblValorSemFiscal: TLabel;
     edTotal: TEdit;
-    edAutorizadas: TEdit;
+    edTransmitidas: TEdit;
     edContingencia: TEdit;
-    edPendentes: TEdit;
+    edSemFiscal: TEdit;
     edRejeitadas: TEdit;
     edCanceladas: TEdit;
     edValorTotal: TEdit;
+    edValorTransmitido: TEdit;
     edValorCont: TEdit;
-    edValorPend: TEdit;
+    edValorSemFiscal: TEdit;
     sgNotas: TStringGrid;
     mmLog: TMemo;
     procedure FormCreate(Sender: TObject);
@@ -58,14 +65,19 @@ type
     procedure btnHealthClick(Sender: TObject);
     procedure btnConsultarClick(Sender: TObject);
     procedure btnEmpresasClick(Sender: TObject);
+    procedure edEmpresaFiltroChange(Sender: TObject);
+    procedure lbEmpresasClick(Sender: TObject);
   private
     FConfig: TConfereOfficeConfig;
     FEmpresas: TArray<TConfereEmpresaDisponivel>;
+    FVisibleEmpresas: TArray<Integer>;
     procedure LoadScreen;
     procedure SaveScreen;
     procedure ApplyGridHeader;
     procedure Log(const AText: string);
     procedure LoadEmpresas;
+    procedure ApplyCompanyFilter;
+    function GetSelectedEmpresaIndex: Integer;
     procedure LoadResumo;
     procedure LoadLista;
   public
@@ -100,18 +112,22 @@ begin
   edApi.Text := FConfig.ApiBaseUrl;
   edToken.Text := FConfig.ApiToken;
   edDias.Text := FConfig.DiasResumo.ToString;
-  cbStatus.Items.Text := 'TODOS'#13#10'AUTORIZADA'#13#10'CONTINGENCIA'#13#10'CONTINGENCIA_AUTORIZADA'#13#10'CONTINGENCIA_PENDENTE'#13#10'PENDENTE_TRANSMISSAO'#13#10'REJEITADA'#13#10'CANCELADA';
+  cbStatus.Items.Text := 'TODOS'#13#10'TRANSMITIDA'#13#10'CONTINGENCIA'#13#10'SEM_FISCAL'#13#10'AUTORIZADA'#13#10'CONTINGENCIA_AUTORIZADA'#13#10'CONTINGENCIA_PENDENTE'#13#10'PENDENTE_TRANSMISSAO'#13#10'REJEITADA'#13#10'CANCELADA';
   cbStatus.ItemIndex := 0;
   edDataInicial.Text := FormatDateTime('yyyy-mm-dd', Date - 7);
   edDataFinal.Text := FormatDateTime('yyyy-mm-dd', Date);
+  edEmpresaFiltro.Text := '';
 end;
 
 procedure TFrmConfereArquivoOfficeMain.SaveScreen;
+var
+  EmpresaIdx: Integer;
 begin
   FConfig.ApiBaseUrl := Trim(edApi.Text);
   FConfig.ApiToken := Trim(edToken.Text);
-  if (cbEmpresa.ItemIndex >= 0) and (cbEmpresa.ItemIndex < Length(FEmpresas)) then
-    FConfig.CNPJEmpresa := FEmpresas[cbEmpresa.ItemIndex].CNPJ;
+  EmpresaIdx := GetSelectedEmpresaIndex;
+  if (EmpresaIdx >= 0) and (EmpresaIdx < Length(FEmpresas)) then
+    FConfig.CNPJEmpresa := FEmpresas[EmpresaIdx].CNPJ;
   FConfig.DiasResumo := StrToIntDef(edDias.Text, 7);
   if FConfig.DiasResumo <= 0 then
     FConfig.DiasResumo := 7;
@@ -133,16 +149,16 @@ begin
   sgNotas.Cells[7,0] := 'Documento';
   sgNotas.Cells[8,0] := 'Protocolo';
   sgNotas.Cells[9,0] := 'Chave';
-  sgNotas.ColWidths[0] := 80;
-  sgNotas.ColWidths[1] := 70;
-  sgNotas.ColWidths[2] := 80;
-  sgNotas.ColWidths[3] := 60;
-  sgNotas.ColWidths[4] := 150;
-  sgNotas.ColWidths[5] := 90;
-  sgNotas.ColWidths[6] := 220;
-  sgNotas.ColWidths[7] := 120;
-  sgNotas.ColWidths[8] := 190;
-  sgNotas.ColWidths[9] := 320;
+  sgNotas.ColWidths[0] := 76;
+  sgNotas.ColWidths[1] := 58;
+  sgNotas.ColWidths[2] := 74;
+  sgNotas.ColWidths[3] := 46;
+  sgNotas.ColWidths[4] := 132;
+  sgNotas.ColWidths[5] := 88;
+  sgNotas.ColWidths[6] := 210;
+  sgNotas.ColWidths[7] := 110;
+  sgNotas.ColWidths[8] := 150;
+  sgNotas.ColWidths[9] := 260;
 end;
 
 procedure TFrmConfereArquivoOfficeMain.Log(const AText: string);
@@ -153,33 +169,59 @@ end;
 procedure TFrmConfereArquivoOfficeMain.LoadEmpresas;
 var
   Client: TConfereOfficeClient;
-  I, SelectIdx: Integer;
 begin
   Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
   try
     FEmpresas := Client.LoadEmpresas;
-    cbEmpresa.Items.BeginUpdate;
-    try
-      cbEmpresa.Items.Clear;
-      SelectIdx := -1;
-      for I := 0 to Length(FEmpresas) - 1 do
-      begin
-        cbEmpresa.Items.Add(Format('%s - %s (%d XML)', [FEmpresas[I].CNPJ, FEmpresas[I].RazaoSocial, FEmpresas[I].QuantidadeXML]));
-        if SameText(FEmpresas[I].CNPJ, FConfig.CNPJEmpresa) then
-          SelectIdx := I;
-      end;
-      if (SelectIdx < 0) and (cbEmpresa.Items.Count > 0) then
-        SelectIdx := 0;
-      cbEmpresa.ItemIndex := SelectIdx;
-      if SelectIdx >= 0 then
-        FConfig.CNPJEmpresa := FEmpresas[SelectIdx].CNPJ;
-    finally
-      cbEmpresa.Items.EndUpdate;
-    end;
+    ApplyCompanyFilter;
     Log(Format('Empresas carregadas: %d', [Length(FEmpresas)]));
   finally
     Client.Free;
   end;
+end;
+
+procedure TFrmConfereArquivoOfficeMain.ApplyCompanyFilter;
+var
+  I, VisibleCount, SelectListIdx: Integer;
+  FilterText, DisplayText: string;
+begin
+  FilterText := Trim(LowerCase(edEmpresaFiltro.Text));
+  SetLength(FVisibleEmpresas, 0);
+  lbEmpresas.Items.BeginUpdate;
+  try
+    lbEmpresas.Items.Clear;
+    SelectListIdx := -1;
+    VisibleCount := 0;
+    for I := 0 to Length(FEmpresas) - 1 do
+    begin
+      DisplayText := Format('%s  |  %s  |  %d XML', [FEmpresas[I].CNPJ, FEmpresas[I].RazaoSocial, FEmpresas[I].QuantidadeXML]);
+      if (FilterText <> '') and
+         (Pos(FilterText, LowerCase(FEmpresas[I].CNPJ)) = 0) and
+         (Pos(FilterText, LowerCase(FEmpresas[I].RazaoSocial)) = 0) then
+        Continue;
+      SetLength(FVisibleEmpresas, VisibleCount + 1);
+      FVisibleEmpresas[VisibleCount] := I;
+      lbEmpresas.Items.Add(DisplayText);
+      if SameText(FEmpresas[I].CNPJ, FConfig.CNPJEmpresa) then
+        SelectListIdx := VisibleCount;
+      Inc(VisibleCount);
+    end;
+    if (SelectListIdx < 0) and (lbEmpresas.Items.Count > 0) then
+      SelectListIdx := 0;
+    lbEmpresas.ItemIndex := SelectListIdx;
+    if SelectListIdx >= 0 then
+      FConfig.CNPJEmpresa := FEmpresas[FVisibleEmpresas[SelectListIdx]].CNPJ;
+    lblQtdEmpresas.Caption := Format('Empresas na lista: %d', [lbEmpresas.Items.Count]);
+  finally
+    lbEmpresas.Items.EndUpdate;
+  end;
+end;
+
+function TFrmConfereArquivoOfficeMain.GetSelectedEmpresaIndex: Integer;
+begin
+  Result := -1;
+  if (lbEmpresas.ItemIndex >= 0) and (lbEmpresas.ItemIndex < Length(FVisibleEmpresas)) then
+    Result := FVisibleEmpresas[lbEmpresas.ItemIndex];
 end;
 
 procedure TFrmConfereArquivoOfficeMain.LoadResumo;
@@ -191,14 +233,15 @@ begin
   try
     Resumo := Client.LoadResumo(FConfig.CNPJEmpresa, StrToIntDef(edDias.Text, 7));
     edTotal.Text := IntToStr(Resumo.QuantidadeTotal);
-    edAutorizadas.Text := IntToStr(Resumo.QuantidadeAutorizada);
+    edTransmitidas.Text := IntToStr(Resumo.QuantidadeTransmitida);
     edContingencia.Text := IntToStr(Resumo.QuantidadeContingencia);
-    edPendentes.Text := IntToStr(Resumo.QuantidadePendente);
+    edSemFiscal.Text := IntToStr(Resumo.QuantidadeSemFiscal);
     edRejeitadas.Text := IntToStr(Resumo.QuantidadeRejeitada);
     edCanceladas.Text := IntToStr(Resumo.QuantidadeCancelada);
     edValorTotal.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalDocumento);
+    edValorTransmitido.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalTransmitido);
     edValorCont.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalContingencia);
-    edValorPend.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalPendente);
+    edValorSemFiscal.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalSemFiscal);
   finally
     Client.Free;
   end;
@@ -239,6 +282,8 @@ end;
 procedure TFrmConfereArquivoOfficeMain.btnConsultarClick(Sender: TObject);
 begin
   SaveScreen;
+  if Trim(FConfig.CNPJEmpresa) = '' then
+    raise Exception.Create('Selecione uma empresa para consultar.');
   LoadResumo;
   LoadLista;
   Log('Consulta executada com sucesso.');
@@ -268,6 +313,23 @@ begin
     Client.Free;
   end;
   LoadEmpresas;
+end;
+
+procedure TFrmConfereArquivoOfficeMain.edEmpresaFiltroChange(Sender: TObject);
+begin
+  ApplyCompanyFilter;
+end;
+
+procedure TFrmConfereArquivoOfficeMain.lbEmpresasClick(Sender: TObject);
+var
+  EmpresaIdx: Integer;
+begin
+  EmpresaIdx := GetSelectedEmpresaIndex;
+  if EmpresaIdx >= 0 then
+  begin
+    FConfig.CNPJEmpresa := FEmpresas[EmpresaIdx].CNPJ;
+    SaveOfficeConfig(FConfig);
+  end;
 end;
 
 end.

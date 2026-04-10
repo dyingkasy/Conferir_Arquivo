@@ -218,26 +218,34 @@ func (p *Postgres) GetResumo(ctx context.Context, cnpj, token string, dias int) 
 	err := p.pool.QueryRow(ctx, `
 		select
 			count(*)::bigint,
+			count(*) filter (where status_operacional in ('AUTORIZADA', 'CONTINGENCIA_AUTORIZADA'))::bigint,
 			count(*) filter (where status_operacional = 'AUTORIZADA')::bigint,
 			count(*) filter (where status_operacional in ('CONTINGENCIA', 'CONTINGENCIA_AUTORIZADA', 'CONTINGENCIA_PENDENTE'))::bigint,
+			count(*) filter (where status_operacional in ('PENDENTE_TRANSMISSAO', 'CONTINGENCIA_PENDENTE'))::bigint,
 			count(*) filter (where status_operacional in ('PENDENTE_TRANSMISSAO', 'CONTINGENCIA_PENDENTE'))::bigint,
 			count(*) filter (where status_operacional = 'REJEITADA')::bigint,
 			count(*) filter (where status_operacional = 'CANCELADA')::bigint,
 			coalesce(sum(total_documento), 0)::float8,
+			coalesce(sum(case when status_operacional in ('AUTORIZADA', 'CONTINGENCIA_AUTORIZADA') then total_documento else 0 end), 0)::float8,
 			coalesce(sum(case when status_operacional in ('CONTINGENCIA', 'CONTINGENCIA_AUTORIZADA', 'CONTINGENCIA_PENDENTE') then total_documento else 0 end), 0)::float8,
+			coalesce(sum(case when status_operacional in ('PENDENTE_TRANSMISSAO', 'CONTINGENCIA_PENDENTE') then total_documento else 0 end), 0)::float8,
 			coalesce(sum(case when status_operacional in ('PENDENTE_TRANSMISSAO', 'CONTINGENCIA_PENDENTE') then total_documento else 0 end), 0)::float8
 		from nfce_cabecalho_espelho
 		where cnpj_empresa = $1
 		  and coalesce(data_venda, current_date) >= current_date - ($2::int)
 	`, cnpj, dias).Scan(
 		&resp.QuantidadeTotal,
+		&resp.QuantidadeTransmitida,
 		&resp.QuantidadeAutorizada,
 		&resp.QuantidadeContingencia,
 		&resp.QuantidadePendente,
+		&resp.QuantidadeSemFiscal,
 		&resp.QuantidadeRejeitada,
 		&resp.QuantidadeCancelada,
 		&resp.ValorTotalDocumento,
+		&resp.ValorTotalTransmitido,
 		&resp.ValorTotalContingencia,
+		&resp.ValorTotalSemFiscal,
 		&resp.ValorTotalPendente,
 	)
 	return resp, err
@@ -300,9 +308,25 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 	argPos := 2
 
 	if strings.TrimSpace(status) != "" {
-		baseSQL += fmt.Sprintf(" and status_operacional = $%d", argPos)
-		args = append(args, strings.TrimSpace(status))
-		argPos++
+		status = strings.ToUpper(strings.TrimSpace(status))
+		switch status {
+		case "TRANSMITIDA":
+			baseSQL += fmt.Sprintf(" and status_operacional in ($%d, $%d)", argPos, argPos+1)
+			args = append(args, "AUTORIZADA", "CONTINGENCIA_AUTORIZADA")
+			argPos += 2
+		case "CONTINGENCIA":
+			baseSQL += fmt.Sprintf(" and status_operacional in ($%d, $%d, $%d)", argPos, argPos+1, argPos+2)
+			args = append(args, "CONTINGENCIA", "CONTINGENCIA_AUTORIZADA", "CONTINGENCIA_PENDENTE")
+			argPos += 3
+		case "SEM_FISCAL":
+			baseSQL += fmt.Sprintf(" and status_operacional in ($%d, $%d)", argPos, argPos+1)
+			args = append(args, "PENDENTE_TRANSMISSAO", "CONTINGENCIA_PENDENTE")
+			argPos += 2
+		default:
+			baseSQL += fmt.Sprintf(" and status_operacional = $%d", argPos)
+			args = append(args, status)
+			argPos++
+		}
 	}
 	if strings.TrimSpace(dataInicial) != "" {
 		baseSQL += fmt.Sprintf(" and data_venda >= $%d", argPos)

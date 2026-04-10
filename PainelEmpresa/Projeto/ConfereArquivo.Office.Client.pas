@@ -8,13 +8,17 @@ uses
 type
   TConfereResumo = record
     QuantidadeTotal: Integer;
+    QuantidadeTransmitida: Integer;
     QuantidadeAutorizada: Integer;
     QuantidadeContingencia: Integer;
     QuantidadePendente: Integer;
+    QuantidadeSemFiscal: Integer;
     QuantidadeRejeitada: Integer;
     QuantidadeCancelada: Integer;
     ValorTotalDocumento: Currency;
+    ValorTotalTransmitido: Currency;
     ValorTotalContingencia: Currency;
+    ValorTotalSemFiscal: Currency;
     ValorTotalPendente: Currency;
   end;
 
@@ -156,13 +160,17 @@ begin
     if not Assigned(Json) then
       raise Exception.Create('JSON invalido no resumo.');
     Result.QuantidadeTotal := Json.GetValue<Integer>('quantidade_total', 0);
+    Result.QuantidadeTransmitida := Json.GetValue<Integer>('quantidade_transmitida', 0);
     Result.QuantidadeAutorizada := Json.GetValue<Integer>('quantidade_autorizada', 0);
     Result.QuantidadeContingencia := Json.GetValue<Integer>('quantidade_contingencia', 0);
     Result.QuantidadePendente := Json.GetValue<Integer>('quantidade_pendente', 0);
+    Result.QuantidadeSemFiscal := Json.GetValue<Integer>('quantidade_sem_fiscal', 0);
     Result.QuantidadeRejeitada := Json.GetValue<Integer>('quantidade_rejeitada', 0);
     Result.QuantidadeCancelada := Json.GetValue<Integer>('quantidade_cancelada', 0);
     Result.ValorTotalDocumento := JsonToCurrency(Json.GetValue('valor_total_documento').Value);
+    Result.ValorTotalTransmitido := JsonToCurrency(Json.GetValue('valor_total_transmitido').Value);
     Result.ValorTotalContingencia := JsonToCurrency(Json.GetValue('valor_total_contingencia').Value);
+    Result.ValorTotalSemFiscal := JsonToCurrency(Json.GetValue('valor_total_sem_fiscal').Value);
     Result.ValorTotalPendente := JsonToCurrency(Json.GetValue('valor_total_pendente').Value);
   finally
     Json.Free;

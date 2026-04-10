@@ -2,370 +2,442 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
   Left = 0
   Top = 0
   Caption = 'Confere Arquivo - Painel Empresa'
-  ClientHeight = 760
-  ClientWidth = 1220
+  ClientHeight = 768
+  ClientWidth = 1280
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -13
+  Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
   OldCreateOrder = False
   Position = poScreenCenter
+  WindowState = wsMaximized
   OnCreate = FormCreate
   PixelsPerInch = 96
-  TextHeight = 17
+  TextHeight = 15
   object pnlHeader: TPanel
     Left = 0
     Top = 0
-    Width = 1220
-    Height = 84
+    Width = 1280
+    Height = 64
     Align = alTop
     BevelOuter = bvNone
     Color = 3815994
     ParentBackground = False
     TabOrder = 0
     object lblTitulo: TLabel
-      Left = 20
-      Top = 16
-      Width = 288
-      Height = 30
+      Left = 18
+      Top = 10
+      Width = 255
+      Height = 25
       Caption = 'Confere Arquivo - Painel'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWhite
-      Font.Height = -24
+      Font.Height = -20
       Font.Name = 'Segoe UI Semibold'
       Font.Style = []
       ParentFont = False
     end
     object lblSubtitulo: TLabel
-      Left = 20
-      Top = 49
-      Width = 373
-      Height = 17
-      Caption = 'Consulta espelho de NFC-e recebido pela API da VPS.'
+      Left = 18
+      Top = 37
+      Width = 511
+      Height = 15
+      Caption = 'Conferencia de NFC-e transmitidas, contingencia, sem fiscal e totais por empresa.'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = 15724527
-      Font.Height = -13
+      Font.Height = -12
       Font.Name = 'Segoe UI'
       Font.Style = []
       ParentFont = False
     end
   end
-  object gbConexao: TGroupBox
-    Left = 16
-    Top = 96
-    Width = 1188
-    Height = 97
-    Caption = 'Conexao'
+  object pnlLeft: TPanel
+    Left = 0
+    Top = 64
+    Width = 320
+    Height = 704
+    Align = alLeft
+    BevelOuter = bvNone
+    Padding.Left = 12
+    Padding.Top = 10
+    Padding.Right = 8
+    Padding.Bottom = 12
     TabOrder = 1
-    object lblApi: TLabel
-      Left = 16
-      Top = 30
-      Width = 50
-      Height = 17
-      Caption = 'API URL'
-    end
-    object lblToken: TLabel
-      Left = 462
-      Top = 30
-      Width = 37
-      Height = 17
-      Caption = 'Token'
-    end
-    object lblEmpresaSel: TLabel
-      Left = 811
-      Top = 30
-      Width = 47
-      Height = 17
-      Caption = 'Empresa'
-    end
-    object edApi: TEdit
-      Left = 16
-      Top = 49
-      Width = 430
-      Height = 25
+    object gbConexao: TGroupBox
+      Left = 12
+      Top = 10
+      Width = 300
+      Height = 170
+      Align = alTop
+      Caption = 'Conexao'
       TabOrder = 0
+      object lblApi: TLabel
+        Left = 12
+        Top = 24
+        Width = 43
+        Height = 15
+        Caption = 'API URL'
+      end
+      object lblToken: TLabel
+        Left = 12
+        Top = 72
+        Width = 31
+        Height = 15
+        Caption = 'Token'
+      end
+      object edApi: TEdit
+        Left = 12
+        Top = 41
+        Width = 276
+        Height = 23
+        TabOrder = 0
+      end
+      object edToken: TEdit
+        Left = 12
+        Top = 89
+        Width = 276
+        Height = 23
+        TabOrder = 1
+      end
+      object btnSalvar: TButton
+        Left = 12
+        Top = 126
+        Width = 84
+        Height = 28
+        Caption = 'Salvar'
+        TabOrder = 2
+        OnClick = btnSalvarClick
+      end
+      object btnHealth: TButton
+        Left = 106
+        Top = 126
+        Width = 84
+        Height = 28
+        Caption = 'Health'
+        TabOrder = 3
+        OnClick = btnHealthClick
+      end
+      object btnEmpresas: TButton
+        Left = 200
+        Top = 126
+        Width = 88
+        Height = 28
+        Caption = 'Atualizar'
+        TabOrder = 4
+        OnClick = btnEmpresasClick
+      end
     end
-    object edToken: TEdit
-      Left = 462
-      Top = 49
-      Width = 463
-      Height = 25
-      TabOrder = 1
-    end
-    object cbEmpresa: TComboBox
-      Left = 811
-      Top = 49
-      Width = 253
-      Height = 25
-      Style = csDropDownList
-      TabOrder = 2
-    end
-    object btnSalvar: TButton
-      Left = 1078
-      Top = 17
-      Width = 95
-      Height = 23
-      Caption = 'Salvar'
-      TabOrder = 3
-      OnClick = btnSalvarClick
-    end
-    object btnHealth: TButton
-      Left = 1078
-      Top = 44
-      Width = 95
-      Height = 23
-      Caption = 'Health'
-      TabOrder = 4
-      OnClick = btnHealthClick
-    end
-    object btnEmpresas: TButton
-      Left = 1078
-      Top = 69
-      Width = 95
-      Height = 23
+    object gbEmpresas: TGroupBox
+      Left = 12
+      Top = 180
+      Width = 300
+      Height = 512
+      Align = alClient
       Caption = 'Empresas'
-      TabOrder = 5
-      OnClick = btnEmpresasClick
+      TabOrder = 1
+      object lblEmpresaFiltro: TLabel
+        Left = 12
+        Top = 25
+        Width = 90
+        Height = 15
+        Caption = 'Filtro da empresa'
+      end
+      object lblQtdEmpresas: TLabel
+        Left = 12
+        Top = 70
+        Width = 107
+        Height = 15
+        Caption = 'Empresas na lista: 0'
+      end
+      object edEmpresaFiltro: TEdit
+        Left = 12
+        Top = 42
+        Width = 276
+        Height = 23
+        TabOrder = 0
+        OnChange = edEmpresaFiltroChange
+      end
+      object lbEmpresas: TListBox
+        Left = 12
+        Top = 91
+        Width = 276
+        Height = 407
+        ItemHeight = 15
+        TabOrder = 1
+        OnClick = lbEmpresasClick
+      end
     end
   end
-  object gbFiltros: TGroupBox
-    Left = 16
-    Top = 202
-    Width = 1188
-    Height = 89
-    Caption = 'Filtros'
+  object pnlConteudo: TPanel
+    Left = 320
+    Top = 64
+    Width = 960
+    Height = 704
+    Align = alClient
+    BevelOuter = bvNone
+    Padding.Left = 8
+    Padding.Top = 10
+    Padding.Right = 12
+    Padding.Bottom = 12
     TabOrder = 2
-    object lblStatus: TLabel
-      Left = 16
-      Top = 29
-      Width = 37
-      Height = 17
-      Caption = 'Status'
-    end
-    object lblDataInicial: TLabel
-      Left = 235
-      Top = 29
-      Width = 65
-      Height = 17
-      Caption = 'Data inicial'
-    end
-    object lblDataFinal: TLabel
-      Left = 373
-      Top = 29
-      Width = 56
-      Height = 17
-      Caption = 'Data final'
-    end
-    object lblDias: TLabel
-      Left = 511
-      Top = 29
-      Width = 71
-      Height = 17
-      Caption = 'Dias resumo'
-    end
-    object cbStatus: TComboBox
-      Left = 16
-      Top = 48
-      Width = 201
-      Height = 25
-      Style = csDropDownList
+    object gbFiltros: TGroupBox
+      Left = 8
+      Top = 10
+      Width = 940
+      Height = 74
+      Align = alTop
+      Caption = 'Filtros'
       TabOrder = 0
+      object lblStatus: TLabel
+        Left = 12
+        Top = 23
+        Width = 33
+        Height = 15
+        Caption = 'Status'
+      end
+      object lblDataInicial: TLabel
+        Left = 238
+        Top = 23
+        Width = 57
+        Height = 15
+        Caption = 'Data inicial'
+      end
+      object lblDataFinal: TLabel
+        Left = 352
+        Top = 23
+        Width = 50
+        Height = 15
+        Caption = 'Data final'
+      end
+      object lblDias: TLabel
+        Left = 466
+        Top = 23
+        Width = 63
+        Height = 15
+        Caption = 'Dias resumo'
+      end
+      object cbStatus: TComboBox
+        Left = 12
+        Top = 40
+        Width = 210
+        Height = 23
+        Style = csDropDownList
+        TabOrder = 0
+      end
+      object edDataInicial: TEdit
+        Left = 238
+        Top = 40
+        Width = 96
+        Height = 23
+        TabOrder = 1
+      end
+      object edDataFinal: TEdit
+        Left = 352
+        Top = 40
+        Width = 96
+        Height = 23
+        TabOrder = 2
+      end
+      object edDias: TEdit
+        Left = 466
+        Top = 40
+        Width = 64
+        Height = 23
+        TabOrder = 3
+      end
+      object btnConsultar: TButton
+        Left = 546
+        Top = 37
+        Width = 126
+        Height = 28
+        Caption = 'Consultar Agora'
+        TabOrder = 4
+        OnClick = btnConsultarClick
+      end
     end
-    object edDataInicial: TEdit
-      Left = 235
-      Top = 48
-      Width = 120
-      Height = 25
+    object gbResumo: TGroupBox
+      Left = 8
+      Top = 84
+      Width = 940
+      Height = 118
+      Align = alTop
+      Caption = 'Resumo'
       TabOrder = 1
+      object lblTotal: TLabel
+        Left = 12
+        Top = 24
+        Width = 25
+        Height = 15
+        Caption = 'Total'
+      end
+      object lblTransmitidas: TLabel
+        Left = 102
+        Top = 24
+        Width = 66
+        Height = 15
+        Caption = 'Transmitidas'
+      end
+      object lblContingencia: TLabel
+        Left = 192
+        Top = 24
+        Width = 72
+        Height = 15
+        Caption = 'Contingencia'
+      end
+      object lblSemFiscal: TLabel
+        Left = 282
+        Top = 24
+        Width = 56
+        Height = 15
+        Caption = 'Sem fiscal'
+      end
+      object lblRejeitadas: TLabel
+        Left = 372
+        Top = 24
+        Width = 56
+        Height = 15
+        Caption = 'Rejeitadas'
+      end
+      object lblCanceladas: TLabel
+        Left = 462
+        Top = 24
+        Width = 60
+        Height = 15
+        Caption = 'Canceladas'
+      end
+      object lblValorTotal: TLabel
+        Left = 12
+        Top = 68
+        Width = 52
+        Height = 15
+        Caption = 'Valor total'
+      end
+      object lblValorTransmitido: TLabel
+        Left = 192
+        Top = 68
+        Width = 93
+        Height = 15
+        Caption = 'Valor transmitido'
+      end
+      object lblValorCont: TLabel
+        Left = 372
+        Top = 68
+        Width = 92
+        Height = 15
+        Caption = 'Valor contingencia'
+      end
+      object lblValorSemFiscal: TLabel
+        Left = 552
+        Top = 68
+        Width = 76
+        Height = 15
+        Caption = 'Valor sem fiscal'
+      end
+      object edTotal: TEdit
+        Left = 12
+        Top = 40
+        Width = 74
+        Height = 23
+        ReadOnly = True
+        TabOrder = 0
+      end
+      object edTransmitidas: TEdit
+        Left = 102
+        Top = 40
+        Width = 74
+        Height = 23
+        ReadOnly = True
+        TabOrder = 1
+      end
+      object edContingencia: TEdit
+        Left = 192
+        Top = 40
+        Width = 74
+        Height = 23
+        ReadOnly = True
+        TabOrder = 2
+      end
+      object edSemFiscal: TEdit
+        Left = 282
+        Top = 40
+        Width = 74
+        Height = 23
+        ReadOnly = True
+        TabOrder = 3
+      end
+      object edRejeitadas: TEdit
+        Left = 372
+        Top = 40
+        Width = 74
+        Height = 23
+        ReadOnly = True
+        TabOrder = 4
+      end
+      object edCanceladas: TEdit
+        Left = 462
+        Top = 40
+        Width = 74
+        Height = 23
+        ReadOnly = True
+        TabOrder = 5
+      end
+      object edValorTotal: TEdit
+        Left = 12
+        Top = 84
+        Width = 160
+        Height = 23
+        ReadOnly = True
+        TabOrder = 6
+      end
+      object edValorTransmitido: TEdit
+        Left = 192
+        Top = 84
+        Width = 160
+        Height = 23
+        ReadOnly = True
+        TabOrder = 7
+      end
+      object edValorCont: TEdit
+        Left = 372
+        Top = 84
+        Width = 160
+        Height = 23
+        ReadOnly = True
+        TabOrder = 8
+      end
+      object edValorSemFiscal: TEdit
+        Left = 552
+        Top = 84
+        Width = 160
+        Height = 23
+        ReadOnly = True
+        TabOrder = 9
+      end
     end
-    object edDataFinal: TEdit
-      Left = 373
-      Top = 48
-      Width = 120
-      Height = 25
-      TabOrder = 2
-    end
-    object edDias: TEdit
-      Left = 511
-      Top = 48
-      Width = 79
-      Height = 25
+    object mmLog: TMemo
+      Left = 8
+      Top = 600
+      Width = 940
+      Height = 92
+      Align = alBottom
+      ReadOnly = True
+      ScrollBars = ssVertical
       TabOrder = 3
     end
-    object btnConsultar: TButton
-      Left = 610
-      Top = 46
-      Width = 121
-      Height = 28
-      Caption = 'Consultar Agora'
-      TabOrder = 4
-      OnClick = btnConsultarClick
-    end
-  end
-  object gbResumo: TGroupBox
-    Left = 16
-    Top = 300
-    Width = 1188
-    Height = 105
-    Caption = 'Resumo'
-    TabOrder = 3
-    object lblTotal: TLabel
-      Left = 16
-      Top = 29
-      Width = 29
-      Height = 17
-      Caption = 'Total'
-    end
-    object lblAutorizadas: TLabel
-      Left = 111
-      Top = 29
-      Width = 72
-      Height = 17
-      Caption = 'Autorizadas'
-    end
-    object lblContingencia: TLabel
-      Left = 206
-      Top = 29
-      Width = 80
-      Height = 17
-      Caption = 'Contingencia'
-    end
-    object lblPendentes: TLabel
-      Left = 301
-      Top = 29
-      Width = 65
-      Height = 17
-      Caption = 'Pendentes'
-    end
-    object lblRejeitadas: TLabel
-      Left = 396
-      Top = 29
-      Width = 61
-      Height = 17
-      Caption = 'Rejeitadas'
-    end
-    object lblCanceladas: TLabel
-      Left = 491
-      Top = 29
-      Width = 65
-      Height = 17
-      Caption = 'Canceladas'
-    end
-    object lblValorTotal: TLabel
-      Left = 606
-      Top = 29
-      Width = 59
-      Height = 17
-      Caption = 'Valor total'
-    end
-    object lblValorCont: TLabel
-      Left = 777
-      Top = 29
-      Width = 100
-      Height = 17
-      Caption = 'Valor contingencia'
-    end
-    object lblValorPend: TLabel
-      Left = 968
-      Top = 29
-      Width = 85
-      Height = 17
-      Caption = 'Valor pendente'
-    end
-    object edTotal: TEdit
-      Left = 16
-      Top = 48
-      Width = 79
-      Height = 25
-      ReadOnly = True
-      TabOrder = 0
-    end
-    object edAutorizadas: TEdit
-      Left = 111
-      Top = 48
-      Width = 79
-      Height = 25
-      ReadOnly = True
-      TabOrder = 1
-    end
-    object edContingencia: TEdit
-      Left = 206
-      Top = 48
-      Width = 79
-      Height = 25
-      ReadOnly = True
+    object sgNotas: TStringGrid
+      Left = 8
+      Top = 202
+      Width = 940
+      Height = 398
+      Align = alClient
+      ColCount = 10
+      DefaultRowHeight = 21
+      FixedCols = 0
+      RowCount = 2
+      Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goColSizing, goRowSelect]
       TabOrder = 2
     end
-    object edPendentes: TEdit
-      Left = 301
-      Top = 48
-      Width = 79
-      Height = 25
-      ReadOnly = True
-      TabOrder = 3
-    end
-    object edRejeitadas: TEdit
-      Left = 396
-      Top = 48
-      Width = 79
-      Height = 25
-      ReadOnly = True
-      TabOrder = 4
-    end
-    object edCanceladas: TEdit
-      Left = 491
-      Top = 48
-      Width = 79
-      Height = 25
-      ReadOnly = True
-      TabOrder = 5
-    end
-    object edValorTotal: TEdit
-      Left = 606
-      Top = 48
-      Width = 151
-      Height = 25
-      ReadOnly = True
-      TabOrder = 6
-    end
-    object edValorCont: TEdit
-      Left = 777
-      Top = 48
-      Width = 171
-      Height = 25
-      ReadOnly = True
-      TabOrder = 7
-    end
-    object edValorPend: TEdit
-      Left = 968
-      Top = 48
-      Width = 171
-      Height = 25
-      ReadOnly = True
-      TabOrder = 8
-    end
-  end
-  object sgNotas: TStringGrid
-    Left = 16
-    Top = 417
-    Width = 1188
-    Height = 248
-    ColCount = 10
-    DefaultRowHeight = 22
-    FixedCols = 0
-    RowCount = 2
-    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goColSizing, goRowSelect]
-    TabOrder = 4
-  end
-  object mmLog: TMemo
-    Left = 16
-    Top = 676
-    Width = 1188
-    Height = 69
-    ReadOnly = True
-    ScrollBars = ssVertical
-    TabOrder = 5
   end
 end
