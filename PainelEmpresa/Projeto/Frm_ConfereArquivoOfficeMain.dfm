@@ -73,12 +73,12 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
       Height = 17
       Caption = 'Token'
     end
-    object lblCNPJ: TLabel
-      Left = 941
+    object lblEmpresaSel: TLabel
+      Left = 811
       Top = 30
-      Width = 33
+      Width = 47
       Height = 17
-      Caption = 'CNPJ'
+      Caption = 'Empresa'
     end
     object edApi: TEdit
       Left = 16
@@ -94,30 +94,40 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
       Height = 25
       TabOrder = 1
     end
-    object edCNPJ: TEdit
-      Left = 941
+    object cbEmpresa: TComboBox
+      Left = 811
       Top = 49
-      Width = 123
+      Width = 253
       Height = 25
+      Style = csDropDownList
       TabOrder = 2
     end
     object btnSalvar: TButton
       Left = 1078
-      Top = 21
+      Top = 17
       Width = 95
-      Height = 25
+      Height = 23
       Caption = 'Salvar'
       TabOrder = 3
       OnClick = btnSalvarClick
     end
     object btnHealth: TButton
       Left = 1078
-      Top = 52
+      Top = 44
       Width = 95
-      Height = 25
+      Height = 23
       Caption = 'Health'
       TabOrder = 4
       OnClick = btnHealthClick
+    end
+    object btnEmpresas: TButton
+      Left = 1078
+      Top = 69
+      Width = 95
+      Height = 23
+      Caption = 'Empresas'
+      TabOrder = 5
+      OnClick = btnEmpresasClick
     end
   end
   object gbFiltros: TGroupBox

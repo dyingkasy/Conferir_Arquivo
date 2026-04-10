@@ -15,12 +15,13 @@ type
     gbConexao: TGroupBox;
     lblApi: TLabel;
     lblToken: TLabel;
-    lblCNPJ: TLabel;
+    lblEmpresaSel: TLabel;
     edApi: TEdit;
     edToken: TEdit;
-    edCNPJ: TEdit;
+    cbEmpresa: TComboBox;
     btnSalvar: TButton;
     btnHealth: TButton;
+    btnEmpresas: TButton;
     gbFiltros: TGroupBox;
     lblStatus: TLabel;
     lblDataInicial: TLabel;
@@ -56,12 +57,15 @@ type
     procedure btnSalvarClick(Sender: TObject);
     procedure btnHealthClick(Sender: TObject);
     procedure btnConsultarClick(Sender: TObject);
+    procedure btnEmpresasClick(Sender: TObject);
   private
     FConfig: TConfereOfficeConfig;
+    FEmpresas: TArray<TConfereEmpresaDisponivel>;
     procedure LoadScreen;
     procedure SaveScreen;
     procedure ApplyGridHeader;
     procedure Log(const AText: string);
+    procedure LoadEmpresas;
     procedure LoadResumo;
     procedure LoadLista;
   public
@@ -83,13 +87,18 @@ begin
   ConfigureConfereLogger(FConfig.LogPath);
   LoadScreen;
   ApplyGridHeader;
+  try
+    LoadEmpresas;
+  except
+    on E: Exception do
+      Log('Falha carregando empresas: ' + E.Message);
+  end;
 end;
 
 procedure TFrmConfereArquivoOfficeMain.LoadScreen;
 begin
   edApi.Text := FConfig.ApiBaseUrl;
   edToken.Text := FConfig.ApiToken;
-  edCNPJ.Text := FConfig.CNPJEmpresa;
   edDias.Text := FConfig.DiasResumo.ToString;
   cbStatus.Items.Text := 'TODOS'#13#10'AUTORIZADA'#13#10'CONTINGENCIA'#13#10'CONTINGENCIA_AUTORIZADA'#13#10'CONTINGENCIA_PENDENTE'#13#10'PENDENTE_TRANSMISSAO'#13#10'REJEITADA'#13#10'CANCELADA';
   cbStatus.ItemIndex := 0;
@@ -101,7 +110,8 @@ procedure TFrmConfereArquivoOfficeMain.SaveScreen;
 begin
   FConfig.ApiBaseUrl := Trim(edApi.Text);
   FConfig.ApiToken := Trim(edToken.Text);
-  FConfig.CNPJEmpresa := Trim(edCNPJ.Text);
+  if (cbEmpresa.ItemIndex >= 0) and (cbEmpresa.ItemIndex < Length(FEmpresas)) then
+    FConfig.CNPJEmpresa := FEmpresas[cbEmpresa.ItemIndex].CNPJ;
   FConfig.DiasResumo := StrToIntDef(edDias.Text, 7);
   if FConfig.DiasResumo <= 0 then
     FConfig.DiasResumo := 7;
@@ -140,20 +150,33 @@ begin
   mmLog.Lines.Add(FormatDateTime('dd/mm/yyyy hh:nn:ss', Now) + '  ' + AText);
 end;
 
-procedure TFrmConfereArquivoOfficeMain.btnSalvarClick(Sender: TObject);
-begin
-  SaveScreen;
-  Log('Configuracao salva.');
-end;
-
-procedure TFrmConfereArquivoOfficeMain.btnHealthClick(Sender: TObject);
+procedure TFrmConfereArquivoOfficeMain.LoadEmpresas;
 var
   Client: TConfereOfficeClient;
+  I, SelectIdx: Integer;
 begin
-  SaveScreen;
   Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
   try
-    Log('Health: ' + Client.Health);
+    FEmpresas := Client.LoadEmpresas;
+    cbEmpresa.Items.BeginUpdate;
+    try
+      cbEmpresa.Items.Clear;
+      SelectIdx := -1;
+      for I := 0 to Length(FEmpresas) - 1 do
+      begin
+        cbEmpresa.Items.Add(Format('%s - %s (%d XML)', [FEmpresas[I].CNPJ, FEmpresas[I].RazaoSocial, FEmpresas[I].QuantidadeXML]));
+        if SameText(FEmpresas[I].CNPJ, FConfig.CNPJEmpresa) then
+          SelectIdx := I;
+      end;
+      if (SelectIdx < 0) and (cbEmpresa.Items.Count > 0) then
+        SelectIdx := 0;
+      cbEmpresa.ItemIndex := SelectIdx;
+      if SelectIdx >= 0 then
+        FConfig.CNPJEmpresa := FEmpresas[SelectIdx].CNPJ;
+    finally
+      cbEmpresa.Items.EndUpdate;
+    end;
+    Log(Format('Empresas carregadas: %d', [Length(FEmpresas)]));
   finally
     Client.Free;
   end;
@@ -219,6 +242,32 @@ begin
   LoadResumo;
   LoadLista;
   Log('Consulta executada com sucesso.');
+end;
+
+procedure TFrmConfereArquivoOfficeMain.btnEmpresasClick(Sender: TObject);
+begin
+  SaveScreen;
+  LoadEmpresas;
+end;
+
+procedure TFrmConfereArquivoOfficeMain.btnSalvarClick(Sender: TObject);
+begin
+  SaveScreen;
+  Log('Configuracao salva.');
+end;
+
+procedure TFrmConfereArquivoOfficeMain.btnHealthClick(Sender: TObject);
+var
+  Client: TConfereOfficeClient;
+begin
+  SaveScreen;
+  Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
+  try
+    Log('Health: ' + Client.Health);
+  finally
+    Client.Free;
+  end;
+  LoadEmpresas;
 end;
 
 end.

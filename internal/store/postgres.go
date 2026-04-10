@@ -80,6 +80,50 @@ func (p *Postgres) ValidateTenantToken(ctx context.Context, cnpj, token string) 
 	return tenant, nil
 }
 
+func (p *Postgres) EnsureTenantToken(ctx context.Context, cnpj, token, razaoSocial string) (model.Tenant, error) {
+	cnpj = model.NormalizeDigits(cnpj)
+	token = strings.TrimSpace(token)
+	razaoSocial = strings.TrimSpace(razaoSocial)
+	if cnpj == "" || token == "" {
+		return model.Tenant{}, errors.New("cnpj and token are required")
+	}
+
+	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return model.Tenant{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, `
+		insert into tenant_empresa (cnpj, razao_social, ativo, created_at, updated_at)
+		values ($1, nullif($2, ''), true, now(), now())
+		on conflict (cnpj) do update
+		set razao_social = coalesce(nullif(excluded.razao_social, ''), tenant_empresa.razao_social),
+		    ativo = true,
+		    updated_at = now()
+	`, cnpj, razaoSocial)
+	if err != nil {
+		return model.Tenant{}, err
+	}
+
+	_, err = tx.Exec(ctx, `
+		insert into tenant_auth_token (cnpj_empresa, token_sha256, descricao, ativo, created_at, updated_at)
+		values ($1, $2, 'provisionado pelo agente', true, now(), now())
+		on conflict (cnpj_empresa, token_sha256) do update
+		set ativo = true,
+		    updated_at = now()
+	`, cnpj, hashToken(token))
+	if err != nil {
+		return model.Tenant{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return model.Tenant{}, err
+	}
+
+	return p.ValidateTenantToken(ctx, cnpj, token)
+}
+
 func (p *Postgres) SaveHeartbeat(ctx context.Context, cnpj, instalacaoID, remoteIP string) error {
 	cnpj = model.NormalizeDigits(cnpj)
 	instalacaoID = strings.TrimSpace(instalacaoID)
@@ -113,7 +157,7 @@ func (p *Postgres) SaveLote(ctx context.Context, lote model.LoteRequest, token, 
 		return errors.New("notas is required")
 	}
 
-	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+	if _, err := p.EnsureTenantToken(ctx, cnpj, token, ""); err != nil {
 		return err
 	}
 
@@ -197,6 +241,44 @@ func (p *Postgres) GetResumo(ctx context.Context, cnpj, token string, dias int) 
 		&resp.ValorTotalPendente,
 	)
 	return resp, err
+}
+
+func (p *Postgres) ListEmpresas(ctx context.Context, token string) ([]model.EmpresaListItem, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil, errors.New("token is required")
+	}
+
+	rows, err := p.pool.Query(ctx, `
+		select te.cnpj,
+		       coalesce(te.razao_social, '') as razao_social,
+		       count(ne.id)::bigint as quantidade_xml,
+		       coalesce(to_char(max(ne.updated_at), 'YYYY-MM-DD HH24:MI:SS'), '') as ultima_atualizacao
+		  from tenant_empresa te
+		  join tenant_auth_token tat
+		    on tat.cnpj_empresa = te.cnpj
+		   and tat.ativo = true
+		   and tat.token_sha256 = $1
+		  join nfce_cabecalho_espelho ne
+		    on ne.cnpj_empresa = te.cnpj
+		 where te.ativo = true
+		 group by te.cnpj, te.razao_social
+		 order by te.razao_social, te.cnpj
+	`, hashToken(token))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.EmpresaListItem, 0)
+	for rows.Next() {
+		var item model.EmpresaListItem
+		if err := rows.Scan(&item.CNPJ, &item.RazaoSocial, &item.QuantidadeXML, &item.UltimaAtualizacao); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }
 
 func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicial, dataFinal string, limit int) ([]model.NFCeListItem, error) {

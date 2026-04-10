@@ -36,6 +36,13 @@ type
     DocumentoCliente: string;
   end;
 
+  TConfereEmpresaDisponivel = record
+    CNPJ: string;
+    RazaoSocial: string;
+    QuantidadeXML: Integer;
+    UltimaAtualizacao: string;
+  end;
+
   TConfereOfficeClient = class
   private
     FBaseUrl: string;
@@ -46,6 +53,7 @@ type
   public
     constructor Create(const ABaseUrl, AToken: string);
     function Health: string;
+    function LoadEmpresas: TArray<TConfereEmpresaDisponivel>;
     function LoadResumo(const ACNPJ: string; ADias: Integer): TConfereResumo;
     function LoadLista(const ACNPJ, AStatus, ADataInicial, ADataFinal: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
   end;
@@ -99,6 +107,41 @@ end;
 function TConfereOfficeClient.Health: string;
 begin
   Result := GetJson(BuildUrl('/health'));
+end;
+
+function TConfereOfficeClient.LoadEmpresas: TArray<TConfereEmpresaDisponivel>;
+var
+  Raw: string;
+  Json: TJSONObject;
+  Arr: TJSONArray;
+  I: Integer;
+  ItemObj: TJSONObject;
+  Item: TConfereEmpresaDisponivel;
+  List: TList<TConfereEmpresaDisponivel>;
+begin
+  Raw := GetJson(BuildUrl('/api/v1/empresas'));
+  Json := TJSONObject.ParseJSONValue(Raw) as TJSONObject;
+  List := TList<TConfereEmpresaDisponivel>.Create;
+  try
+    if not Assigned(Json) then
+      raise Exception.Create('JSON invalido na lista de empresas.');
+    Arr := Json.GetValue<TJSONArray>('items');
+    if Assigned(Arr) then
+      for I := 0 to Arr.Count - 1 do
+      begin
+        ItemObj := Arr.Items[I] as TJSONObject;
+        FillChar(Item, SizeOf(Item), 0);
+        Item.CNPJ := ItemObj.GetValue<string>('cnpj', '');
+        Item.RazaoSocial := ItemObj.GetValue<string>('razao_social', '');
+        Item.QuantidadeXML := ItemObj.GetValue<Integer>('quantidade_xml', 0);
+        Item.UltimaAtualizacao := ItemObj.GetValue<string>('ultima_atualizacao', '');
+        List.Add(Item);
+      end;
+    Result := List.ToArray;
+  finally
+    List.Free;
+    Json.Free;
+  end;
 end;
 
 function TConfereOfficeClient.LoadResumo(const ACNPJ: string; ADias: Integer): TConfereResumo;

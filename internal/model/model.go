@@ -61,6 +61,13 @@ type NFCeListItem struct {
 	DocumentoCliente  string   `json:"documento_cliente"`
 }
 
+type EmpresaListItem struct {
+	CNPJ             string `json:"cnpj"`
+	RazaoSocial      string `json:"razao_social"`
+	QuantidadeXML    int64  `json:"quantidade_xml"`
+	UltimaAtualizacao string `json:"ultima_atualizacao,omitempty"`
+}
+
 type NotaPayload struct {
 	Empresa           map[string]any `json:"empresa"`
 	Venda             map[string]any `json:"venda"`

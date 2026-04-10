@@ -53,8 +53,9 @@ func (h *Handler) ConfigCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.store.ValidateTenantToken(r.Context(), cnpj, token); err != nil {
-		h.writeAuthError(w, err)
+	if _, err := h.store.EnsureTenantToken(r.Context(), cnpj, token, req.RazaoSocial); err != nil {
+		h.logger.Error("failed to provision tenant during config-check", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to provision tenant"})
 		return
 	}
 
@@ -84,8 +85,9 @@ func (h *Handler) Heartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.store.ValidateTenantToken(r.Context(), cnpj, token); err != nil {
-		h.writeAuthError(w, err)
+	if _, err := h.store.EnsureTenantToken(r.Context(), cnpj, token, ""); err != nil {
+		h.logger.Error("failed to provision tenant during heartbeat", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to provision tenant"})
 		return
 	}
 
@@ -129,6 +131,25 @@ func (h *Handler) Lote(w http.ResponseWriter, r *http.Request) {
 		"status":     "ok",
 		"mensagem":   "Lote recebido e persistido.",
 		"quantidade": req.Quantidade,
+	})
+}
+
+func (h *Handler) Empresas(w http.ResponseWriter, r *http.Request) {
+	token := auth.BearerToken(r.Header.Get("Authorization"))
+	if token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bearer token is required"})
+		return
+	}
+	items, err := h.store.ListEmpresas(r.Context(), token)
+	if err != nil {
+		h.logger.Error("failed to list empresas", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list empresas"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "ok",
+		"quantidade": len(items),
+		"items":      items,
 	})
 }
 
