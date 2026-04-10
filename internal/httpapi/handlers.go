@@ -156,6 +156,8 @@ func (h *Handler) Empresas(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Resumo(w http.ResponseWriter, r *http.Request) {
 	token := auth.BearerToken(r.Header.Get("Authorization"))
 	cnpj := model.NormalizeDigits(r.URL.Query().Get("cnpj_empresa"))
+	dataInicial := strings.TrimSpace(r.URL.Query().Get("data_inicial"))
+	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
 	dias := 7
 	if value := strings.TrimSpace(r.URL.Query().Get("dias")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
@@ -166,7 +168,7 @@ func (h *Handler) Resumo(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
 		return
 	}
-	resp, err := h.store.GetResumo(r.Context(), cnpj, token, dias)
+	resp, err := h.store.GetResumo(r.Context(), cnpj, token, dataInicial, dataFinal, dias)
 	if err != nil {
 		h.writeAuthError(w, err)
 		return

@@ -204,7 +204,7 @@ func (p *Postgres) SaveLote(ctx context.Context, lote model.LoteRequest, token, 
 	return tx.Commit(ctx)
 }
 
-func (p *Postgres) GetResumo(ctx context.Context, cnpj, token string, dias int) (model.ResumoResponse, error) {
+func (p *Postgres) GetResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal string, dias int) (model.ResumoResponse, error) {
 	if dias <= 0 {
 		dias = 7
 	}
@@ -215,7 +215,7 @@ func (p *Postgres) GetResumo(ctx context.Context, cnpj, token string, dias int) 
 
 	var resp model.ResumoResponse
 	resp.CNPJEmpresa = cnpj
-	err := p.pool.QueryRow(ctx, `
+	baseSQL := `
 		select
 			count(*)::bigint,
 			count(*) filter (where (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and coalesce(status_erro, '') = '' and (coalesce(protocolo, '') <> '' or data_autorizacao is not null) and upper(coalesce(status_venda, '')) = 'F')::bigint,
@@ -235,8 +235,26 @@ func (p *Postgres) GetResumo(ctx context.Context, cnpj, token string, dias int) 
 			coalesce(sum(imposto_estadual), 0)::float8
 		from nfce_cabecalho_espelho
 		where cnpj_empresa = $1
-		  and coalesce(data_venda, current_date) >= current_date - ($2::int)
-	`, cnpj, dias).Scan(
+	`
+	args := []any{cnpj}
+	argPos := 2
+
+	if strings.TrimSpace(dataInicial) <> "" {
+		baseSQL += fmt.Sprintf(" and coalesce(data_venda, current_date) >= $%d", argPos)
+		args = append(args, dataInicial)
+		argPos++
+	}
+	if strings.TrimSpace(dataFinal) <> "" {
+		baseSQL += fmt.Sprintf(" and coalesce(data_venda, current_date) <= $%d", argPos)
+		args = append(args, dataFinal)
+		argPos++
+	}
+	if strings.TrimSpace(dataInicial) == "" && strings.TrimSpace(dataFinal) == "" {
+		baseSQL += fmt.Sprintf(" and coalesce(data_venda, current_date) >= current_date - ($%d::int)", argPos)
+		args = append(args, dias)
+	}
+
+	err := p.pool.QueryRow(ctx, baseSQL, args...).Scan(
 		&resp.QuantidadeTotal,
 		&resp.QuantidadeTransmitida,
 		&resp.QuantidadeContingencia,

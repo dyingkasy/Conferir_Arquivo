@@ -69,7 +69,7 @@ type
     constructor Create(const ABaseUrl, AToken: string);
     function Health: string;
     function LoadEmpresas: TArray<TConfereEmpresaDisponivel>;
-    function LoadResumo(const ACNPJ: string; ADias: Integer): TConfereResumo;
+    function LoadResumo(const ACNPJ, ADataInicial, ADataFinal: string; ADias: Integer): TConfereResumo;
     function LoadLista(const ACNPJ, AStatus, ADataInicial, ADataFinal: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
   end;
 
@@ -159,13 +159,20 @@ begin
   end;
 end;
 
-function TConfereOfficeClient.LoadResumo(const ACNPJ: string; ADias: Integer): TConfereResumo;
+function TConfereOfficeClient.LoadResumo(const ACNPJ, ADataInicial, ADataFinal: string; ADias: Integer): TConfereResumo;
 var
   Json: TJSONObject;
   Raw: string;
+  Url: string;
 begin
   FillChar(Result, SizeOf(Result), 0);
-  Raw := GetJson(BuildUrl('/api/v1/nfce/resumo?cnpj_empresa=' + ACNPJ + '&dias=' + IntToStr(ADias)));
+  Url := '/api/v1/nfce/resumo?cnpj_empresa=' + ACNPJ;
+  if (Trim(ADataInicial) <> '') and (Trim(ADataFinal) <> '') then
+    Url := Url + '&data_inicial=' + ADataInicial + '&data_final=' + ADataFinal
+  else
+    Url := Url + '&dias=' + IntToStr(ADias);
+
+  Raw := GetJson(BuildUrl(Url));
   Json := TJSONObject.ParseJSONValue(Raw) as TJSONObject;
   try
     if not Assigned(Json) then

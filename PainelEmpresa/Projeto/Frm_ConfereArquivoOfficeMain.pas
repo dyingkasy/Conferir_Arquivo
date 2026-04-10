@@ -3,7 +3,7 @@ unit Frm_ConfereArquivoOfficeMain;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, System.Math,
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, System.Math, System.DateUtils,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
   Vcl.ComCtrls,
   Vcl.Grids, ConfereArquivo.Office.Config, ConfereArquivo.Office.Client;
@@ -32,11 +32,9 @@ type
     lblStatus: TLabel;
     lblDataInicial: TLabel;
     lblDataFinal: TLabel;
-    lblDias: TLabel;
     cbStatus: TComboBox;
     dtDataInicial: TDateTimePicker;
     dtDataFinal: TDateTimePicker;
-    edDias: TEdit;
     btnConsultar: TButton;
     gbResumo: TGroupBox;
     gbTributos: TGroupBox;
@@ -201,10 +199,9 @@ procedure TFrmConfereArquivoOfficeMain.LoadScreen;
 begin
   edApi.Text := FConfig.ApiBaseUrl;
   edToken.Text := FConfig.ApiToken;
-  edDias.Text := FConfig.DiasResumo.ToString;
   cbStatus.Items.Text := 'TODOS'#13#10'TRANSMITIDA'#13#10'CONTINGENCIA'#13#10'ERRO'#13#10'SEM_FISCAL';
   cbStatus.ItemIndex := 0;
-  dtDataInicial.Date := Date - 7;
+  dtDataInicial.Date := StartOfTheMonth(Date);
   dtDataFinal.Date := Date;
   edEmpresaFiltro.Text := '';
 end;
@@ -218,9 +215,6 @@ begin
   EmpresaIdx := GetSelectedEmpresaIndex;
   if (EmpresaIdx >= 0) and (EmpresaIdx < Length(FEmpresas)) then
     FConfig.CNPJEmpresa := FEmpresas[EmpresaIdx].CNPJ;
-  FConfig.DiasResumo := StrToIntDef(edDias.Text, 7);
-  if FConfig.DiasResumo <= 0 then
-    FConfig.DiasResumo := 7;
   SaveOfficeConfig(FConfig);
 end;
 
@@ -358,7 +352,11 @@ var
 begin
   Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
   try
-    Resumo := Client.LoadResumo(FConfig.CNPJEmpresa, StrToIntDef(edDias.Text, 7));
+    Resumo := Client.LoadResumo(
+      FConfig.CNPJEmpresa,
+      FormatDateTime('yyyy-mm-dd', dtDataInicial.Date),
+      FormatDateTime('yyyy-mm-dd', dtDataFinal.Date),
+      FConfig.DiasResumo);
     edTotal.Text := IntToStr(Resumo.QuantidadeTotal);
     edTransmitidas.Text := IntToStr(Resumo.QuantidadeTransmitida);
     edContingencia.Text := IntToStr(Resumo.QuantidadeContingencia);

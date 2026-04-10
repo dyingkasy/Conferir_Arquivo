@@ -211,13 +211,6 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Height = 15
         Caption = 'Data final'
       end
-      object lblDias: TLabel
-        Left = 466
-        Top = 23
-        Width = 63
-        Height = 15
-        Caption = 'Dias resumo'
-      end
       object cbStatus: TComboBox
         Left = 12
         Top = 40
@@ -244,22 +237,15 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Date = 46022.000000000000000000
         Time = 0.000000000000000000
         Kind = dtkDate
-        TabOrder = 1
-      end
-      object edDias: TEdit
-        Left = 466
-        Top = 40
-        Width = 64
-        Height = 23
-        TabOrder = 3
+        TabOrder = 2
       end
       object btnConsultar: TButton
-        Left = 546
+        Left = 466
         Top = 37
         Width = 126
         Height = 28
         Caption = 'Consultar Agora'
-        TabOrder = 4
+        TabOrder = 3
         OnClick = btnConsultarClick
       end
     end
