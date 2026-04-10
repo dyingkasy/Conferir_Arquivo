@@ -124,7 +124,7 @@ var
   IsOffline: Boolean;
   HasNumero: Boolean;
 begin
-  HasProtocol := Trim(ARecord.Protocolo) <> '';
+  HasProtocol := (Trim(ARecord.Protocolo) <> '') or (ARecord.DataAutorizacao > 0);
   HasKey := Trim(ARecord.ChaveAcesso) <> '';
   HasError := Trim(ARecord.StatusErro) <> '';
   IsCanceled := not SameText(Trim(ARecord.NFCeCancelada), 'N') and
@@ -139,23 +139,17 @@ begin
   if IsCanceled then
     Exit(nsCancelada);
 
-  if IsOffline and HasProtocol then
-    Exit(nsContingenciaAutorizada);
-
-  if IsOffline and not HasProtocol then
-    Exit(nsContingenciaPendente);
+  if HasProtocol then
+    Exit(nsAutorizada);
 
   if HasError then
     Exit(nsRejeitada);
 
-  if HasProtocol then
-    Exit(nsAutorizada);
+  if IsOffline and not HasProtocol then
+    Exit(nsContingenciaPendente);
 
   if HasNumero then
     Exit(nsPendenteTransmissao);
-
-  if IsOffline then
-    Exit(nsContingencia);
 
   Result := nsIgnorada;
 end;

@@ -48,6 +48,12 @@ type
     lblValorTransmitido: TLabel;
     lblValorCont: TLabel;
     lblValorSemFiscal: TLabel;
+    lblTribBase: TLabel;
+    lblTribICMS: TLabel;
+    lblTribPIS: TLabel;
+    lblTribCOFINS: TLabel;
+    lblTribFederal: TLabel;
+    lblTribEstadual: TLabel;
     edTotal: TEdit;
     edTransmitidas: TEdit;
     edContingencia: TEdit;
@@ -58,6 +64,12 @@ type
     edValorTransmitido: TEdit;
     edValorCont: TEdit;
     edValorSemFiscal: TEdit;
+    edTribBase: TEdit;
+    edTribICMS: TEdit;
+    edTribPIS: TEdit;
+    edTribCOFINS: TEdit;
+    edTribFederal: TEdit;
+    edTribEstadual: TEdit;
     sgNotas: TStringGrid;
     mmLog: TMemo;
     procedure FormCreate(Sender: TObject);
@@ -67,6 +79,8 @@ type
     procedure btnEmpresasClick(Sender: TObject);
     procedure edEmpresaFiltroChange(Sender: TObject);
     procedure lbEmpresasClick(Sender: TObject);
+    procedure sgNotasDrawCell(Sender: TObject; ACol, ARow: Integer; Rect: TRect;
+      State: TGridDrawState);
   private
     FConfig: TConfereOfficeConfig;
     FEmpresas: TArray<TConfereEmpresaDisponivel>;
@@ -137,28 +151,36 @@ end;
 procedure TFrmConfereArquivoOfficeMain.ApplyGridHeader;
 begin
   sgNotas.FixedRows := 1;
-  sgNotas.ColCount := 10;
+  sgNotas.ColCount := 14;
   sgNotas.RowCount := 2;
   sgNotas.Cells[0,0] := 'Data';
   sgNotas.Cells[1,0] := 'Hora';
-  sgNotas.Cells[2,0] := 'Numero';
-  sgNotas.Cells[3,0] := 'Serie';
-  sgNotas.Cells[4,0] := 'Status';
-  sgNotas.Cells[5,0] := 'Valor';
-  sgNotas.Cells[6,0] := 'Cliente';
-  sgNotas.Cells[7,0] := 'Documento';
-  sgNotas.Cells[8,0] := 'Protocolo';
-  sgNotas.Cells[9,0] := 'Chave';
-  sgNotas.ColWidths[0] := 76;
+  sgNotas.Cells[2,0] := 'Grupo';
+  sgNotas.Cells[3,0] := 'Status';
+  sgNotas.Cells[4,0] := 'Transm.';
+  sgNotas.Cells[5,0] := 'Numero';
+  sgNotas.Cells[6,0] := 'Serie';
+  sgNotas.Cells[7,0] := 'Valor';
+  sgNotas.Cells[8,0] := 'ICMS';
+  sgNotas.Cells[9,0] := 'PIS';
+  sgNotas.Cells[10,0] := 'COFINS';
+  sgNotas.Cells[11,0] := 'Cliente';
+  sgNotas.Cells[12,0] := 'Documento';
+  sgNotas.Cells[13,0] := 'Protocolo';
+  sgNotas.ColWidths[0] := 72;
   sgNotas.ColWidths[1] := 58;
-  sgNotas.ColWidths[2] := 74;
-  sgNotas.ColWidths[3] := 46;
-  sgNotas.ColWidths[4] := 132;
-  sgNotas.ColWidths[5] := 88;
-  sgNotas.ColWidths[6] := 210;
-  sgNotas.ColWidths[7] := 110;
-  sgNotas.ColWidths[8] := 150;
-  sgNotas.ColWidths[9] := 260;
+  sgNotas.ColWidths[2] := 92;
+  sgNotas.ColWidths[3] := 130;
+  sgNotas.ColWidths[4] := 72;
+  sgNotas.ColWidths[5] := 70;
+  sgNotas.ColWidths[6] := 42;
+  sgNotas.ColWidths[7] := 76;
+  sgNotas.ColWidths[8] := 66;
+  sgNotas.ColWidths[9] := 60;
+  sgNotas.ColWidths[10] := 68;
+  sgNotas.ColWidths[11] := 210;
+  sgNotas.ColWidths[12] := 108;
+  sgNotas.ColWidths[13] := 148;
 end;
 
 procedure TFrmConfereArquivoOfficeMain.Log(const AText: string);
@@ -242,6 +264,12 @@ begin
     edValorTransmitido.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalTransmitido);
     edValorCont.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalContingencia);
     edValorSemFiscal.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalSemFiscal);
+    edTribBase.Text := FormatFloat('R$ ,0.00', Resumo.ValorBaseICMS);
+    edTribICMS.Text := FormatFloat('R$ ,0.00', Resumo.ValorICMS);
+    edTribPIS.Text := FormatFloat('R$ ,0.00', Resumo.ValorPIS);
+    edTribCOFINS.Text := FormatFloat('R$ ,0.00', Resumo.ValorCOFINS);
+    edTribFederal.Text := FormatFloat('R$ ,0.00', Resumo.ValorImpostoFederal);
+    edTribEstadual.Text := FormatFloat('R$ ,0.00', Resumo.ValorImpostoEstadual);
   finally
     Client.Free;
   end;
@@ -265,14 +293,18 @@ begin
     begin
       sgNotas.Cells[0, I + 1] := Items[I].DataVenda;
       sgNotas.Cells[1, I + 1] := Items[I].HoraVenda;
-      sgNotas.Cells[2, I + 1] := Items[I].NumeroNFCe;
-      sgNotas.Cells[3, I + 1] := Items[I].SerieNFCe;
-      sgNotas.Cells[4, I + 1] := Items[I].StatusOperacional;
-      sgNotas.Cells[5, I + 1] := FormatFloat('0.00', Items[I].ValorDocumento);
-      sgNotas.Cells[6, I + 1] := Items[I].NomeCliente;
-      sgNotas.Cells[7, I + 1] := Items[I].DocumentoCliente;
-      sgNotas.Cells[8, I + 1] := Items[I].Protocolo;
-      sgNotas.Cells[9, I + 1] := Items[I].ChaveAcesso;
+      sgNotas.Cells[2, I + 1] := Items[I].GrupoConferencia;
+      sgNotas.Cells[3, I + 1] := Items[I].StatusOperacional;
+      sgNotas.Cells[4, I + 1] := Items[I].DataTransmissao;
+      sgNotas.Cells[5, I + 1] := Items[I].NumeroNFCe;
+      sgNotas.Cells[6, I + 1] := Items[I].SerieNFCe;
+      sgNotas.Cells[7, I + 1] := FormatFloat('0.00', Items[I].ValorDocumento);
+      sgNotas.Cells[8, I + 1] := FormatFloat('0.00', Items[I].ICMS);
+      sgNotas.Cells[9, I + 1] := FormatFloat('0.00', Items[I].PIS);
+      sgNotas.Cells[10, I + 1] := FormatFloat('0.00', Items[I].COFINS);
+      sgNotas.Cells[11, I + 1] := Items[I].NomeCliente;
+      sgNotas.Cells[12, I + 1] := Items[I].DocumentoCliente;
+      sgNotas.Cells[13, I + 1] := Items[I].Protocolo;
     end;
   finally
     Client.Free;
@@ -330,6 +362,52 @@ begin
     FConfig.CNPJEmpresa := FEmpresas[EmpresaIdx].CNPJ;
     SaveOfficeConfig(FConfig);
   end;
+end;
+
+procedure TFrmConfereArquivoOfficeMain.sgNotasDrawCell(Sender: TObject; ACol,
+  ARow: Integer; Rect: TRect; State: TGridDrawState);
+var
+  Grid: TStringGrid;
+  FillColor, FontColor: TColor;
+  Text: string;
+begin
+  Grid := Sender as TStringGrid;
+  if ARow = 0 then
+  begin
+    Grid.Canvas.Brush.Color := $00E6E6E6;
+    Grid.Canvas.Font.Color := clBlack;
+  end
+  else
+  begin
+    Text := UpperCase(Grid.Cells[2, ARow]);
+    if Text = 'TRANSMITIDA' then
+    begin
+      FillColor := $00EAF6EA;
+      FontColor := $001F5E2E;
+    end
+    else if Text = 'CONTINGENCIA' then
+    begin
+      FillColor := $00EEF4FF;
+      FontColor := $00694A00;
+    end
+    else
+    begin
+      FillColor := $00F8F1E8;
+      FontColor := $007A3E00;
+    end;
+
+    if gdSelected in State then
+      Grid.Canvas.Brush.Color := $00D9B55D
+    else
+      Grid.Canvas.Brush.Color := FillColor;
+
+    Grid.Canvas.Font.Color := FontColor;
+  end;
+
+  Grid.Canvas.FillRect(Rect);
+  Text := Grid.Cells[ACol, ARow];
+  InflateRect(Rect, -3, 0);
+  DrawText(Grid.Canvas.Handle, PChar(Text), Length(Text), Rect, DT_LEFT or DT_VCENTER or DT_SINGLELINE);
 end;
 
 end.

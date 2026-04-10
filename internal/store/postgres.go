@@ -218,18 +218,24 @@ func (p *Postgres) GetResumo(ctx context.Context, cnpj, token string, dias int) 
 	err := p.pool.QueryRow(ctx, `
 		select
 			count(*)::bigint,
-			count(*) filter (where status_operacional in ('AUTORIZADA', 'CONTINGENCIA_AUTORIZADA'))::bigint,
-			count(*) filter (where status_operacional = 'AUTORIZADA')::bigint,
-			count(*) filter (where status_operacional in ('CONTINGENCIA', 'CONTINGENCIA_AUTORIZADA', 'CONTINGENCIA_PENDENTE'))::bigint,
-			count(*) filter (where status_operacional in ('PENDENTE_TRANSMISSAO', 'CONTINGENCIA_PENDENTE'))::bigint,
-			count(*) filter (where status_operacional in ('PENDENTE_TRANSMISSAO', 'CONTINGENCIA_PENDENTE'))::bigint,
+			count(*) filter (where (coalesce(protocolo, '') <> '' or data_autorizacao is not null))::bigint,
+			count(*) filter (where (coalesce(protocolo, '') <> '' or data_autorizacao is not null))::bigint,
+			count(*) filter (where (coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S'))::bigint,
+			count(*) filter (where (coalesce(protocolo, '') = '' and data_autorizacao is null))::bigint,
+			count(*) filter (where (coalesce(protocolo, '') = '' and data_autorizacao is null) and coalesce(dhcont, '') = '' and upper(coalesce(nfce_offline, 'N')) <> 'S')::bigint,
 			count(*) filter (where status_operacional = 'REJEITADA')::bigint,
 			count(*) filter (where status_operacional = 'CANCELADA')::bigint,
 			coalesce(sum(total_documento), 0)::float8,
-			coalesce(sum(case when status_operacional in ('AUTORIZADA', 'CONTINGENCIA_AUTORIZADA') then total_documento else 0 end), 0)::float8,
-			coalesce(sum(case when status_operacional in ('CONTINGENCIA', 'CONTINGENCIA_AUTORIZADA', 'CONTINGENCIA_PENDENTE') then total_documento else 0 end), 0)::float8,
-			coalesce(sum(case when status_operacional in ('PENDENTE_TRANSMISSAO', 'CONTINGENCIA_PENDENTE') then total_documento else 0 end), 0)::float8,
-			coalesce(sum(case when status_operacional in ('PENDENTE_TRANSMISSAO', 'CONTINGENCIA_PENDENTE') then total_documento else 0 end), 0)::float8
+			coalesce(sum(case when (coalesce(protocolo, '') <> '' or data_autorizacao is not null) then total_documento else 0 end), 0)::float8,
+			coalesce(sum(case when (coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S') then total_documento else 0 end), 0)::float8,
+			coalesce(sum(case when (coalesce(protocolo, '') = '' and data_autorizacao is null) and coalesce(dhcont, '') = '' and upper(coalesce(nfce_offline, 'N')) <> 'S' then total_documento else 0 end), 0)::float8,
+			coalesce(sum(case when (coalesce(protocolo, '') = '' and data_autorizacao is null) then total_documento else 0 end), 0)::float8,
+			coalesce(sum(base_icms), 0)::float8,
+			coalesce(sum(icms), 0)::float8,
+			coalesce(sum(pis), 0)::float8,
+			coalesce(sum(cofins), 0)::float8,
+			coalesce(sum(imposto), 0)::float8,
+			coalesce(sum(imposto_estadual), 0)::float8
 		from nfce_cabecalho_espelho
 		where cnpj_empresa = $1
 		  and coalesce(data_venda, current_date) >= current_date - ($2::int)
@@ -247,6 +253,12 @@ func (p *Postgres) GetResumo(ctx context.Context, cnpj, token string, dias int) 
 		&resp.ValorTotalContingencia,
 		&resp.ValorTotalSemFiscal,
 		&resp.ValorTotalPendente,
+		&resp.ValorBaseICMS,
+		&resp.ValorICMS,
+		&resp.ValorPIS,
+		&resp.ValorCOFINS,
+		&resp.ValorImpostoFederal,
+		&resp.ValorImpostoEstadual,
 	)
 	return resp, err
 }
@@ -299,8 +311,14 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 	}
 
 	baseSQL := `
-		select source_id, instalacao_id, data_venda, hora_venda, num_nfce, serie_nfce, chave_acesso, protocolo,
-		       status_operacional, status_erro, nfce_offline, nfce_cancelada, total_documento, nome_cliente, documento_cliente
+		select source_id, instalacao_id,
+		       case
+		         when (coalesce(protocolo, '') <> '' or data_autorizacao is not null) then 'TRANSMITIDA'
+		         when ((coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S')) then 'CONTINGENCIA'
+		         else 'SEM_FISCAL'
+		       end as grupo_conferencia,
+		       data_venda, hora_venda, data_autorizacao, num_nfce, serie_nfce, chave_acesso, protocolo,
+		       status_operacional, status_erro, nfce_offline, nfce_cancelada, total_documento, base_icms, icms, pis, cofins, imposto, imposto_estadual, nome_cliente, documento_cliente
 		from nfce_cabecalho_espelho
 		where cnpj_empresa = $1
 	`
@@ -311,17 +329,11 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 		status = strings.ToUpper(strings.TrimSpace(status))
 		switch status {
 		case "TRANSMITIDA":
-			baseSQL += fmt.Sprintf(" and status_operacional in ($%d, $%d)", argPos, argPos+1)
-			args = append(args, "AUTORIZADA", "CONTINGENCIA_AUTORIZADA")
-			argPos += 2
+			baseSQL += " and (coalesce(protocolo, '') <> '' or data_autorizacao is not null)"
 		case "CONTINGENCIA":
-			baseSQL += fmt.Sprintf(" and status_operacional in ($%d, $%d, $%d)", argPos, argPos+1, argPos+2)
-			args = append(args, "CONTINGENCIA", "CONTINGENCIA_AUTORIZADA", "CONTINGENCIA_PENDENTE")
-			argPos += 3
+			baseSQL += " and (coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S')"
 		case "SEM_FISCAL":
-			baseSQL += fmt.Sprintf(" and status_operacional in ($%d, $%d)", argPos, argPos+1)
-			args = append(args, "PENDENTE_TRANSMISSAO", "CONTINGENCIA_PENDENTE")
-			argPos += 2
+			baseSQL += " and (coalesce(protocolo, '') = '' and data_autorizacao is null) and coalesce(dhcont, '') = '' and upper(coalesce(nfce_offline, 'N')) <> 'S'"
 		default:
 			baseSQL += fmt.Sprintf(" and status_operacional = $%d", argPos)
 			args = append(args, status)
@@ -352,12 +364,21 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 	for rows.Next() {
 		var item model.NFCeListItem
 		var dataVenda *time.Time
+		var dataTransmissao *time.Time
 		var valorDoc *float64
+		var baseICMS *float64
+		var icms *float64
+		var pis *float64
+		var cofins *float64
+		var impostoFederal *float64
+		var impostoEstadual *float64
 		if err := rows.Scan(
 			&item.SourceID,
 			&item.InstalacaoID,
+			&item.GrupoConferencia,
 			&dataVenda,
 			&item.HoraVenda,
+			&dataTransmissao,
 			&item.NumeroNFCe,
 			&item.SerieNFCe,
 			&item.ChaveAcesso,
@@ -367,6 +388,12 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 			&item.NFCeOffline,
 			&item.NFCeCancelada,
 			&valorDoc,
+			&baseICMS,
+			&icms,
+			&pis,
+			&cofins,
+			&impostoFederal,
+			&impostoEstadual,
 			&item.NomeCliente,
 			&item.DocumentoCliente,
 		); err != nil {
@@ -376,7 +403,17 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 			v := dataVenda.Format("2006-01-02")
 			item.DataVenda = &v
 		}
+		if dataTransmissao != nil {
+			v := dataTransmissao.Format("2006-01-02")
+			item.DataTransmissao = &v
+		}
 		item.ValorDocumento = valorDoc
+		item.BaseICMS = baseICMS
+		item.ICMS = icms
+		item.PIS = pis
+		item.COFINS = cofins
+		item.ImpostoFederal = impostoFederal
+		item.ImpostoEstadual = impostoEstadual
 		items = append(items, item)
 	}
 	return items, rows.Err()
@@ -521,11 +558,6 @@ func buildEspelhoRow(cnpj, instalacaoID string, rawNota []byte, remoteIP string)
 		DHCont:           getString(venda, "dhcont"),
 		DocumentoCliente: getString(venda, "documento_cliente"),
 		NomeCliente:      truncate(getString(venda, "nome_cliente"), 150),
-		StatusOperacional: firstNonEmpty(
-			getString(venda, "status_operacional"),
-			strings.TrimSpace(nota.StatusOperacional),
-			getStringMap(noteRoot, "status_operacional"),
-		),
 		PayloadJSON: rawNota,
 		RemoteIP:    remoteIP,
 	}
@@ -575,7 +607,38 @@ func buildEspelhoRow(cnpj, instalacaoID string, rawNota []byte, remoteIP string)
 		}
 	}
 
+	row.StatusOperacional = classifyStatus(row)
+
 	return row, nil
+}
+
+func classifyStatus(row model.NFCeEspelhoRow) string {
+	hasProtocol := strings.TrimSpace(row.Protocolo) != "" || row.DataAutorizacao != nil
+	isCanceled := strings.TrimSpace(row.NFCeCancelada) != "" && !strings.EqualFold(strings.TrimSpace(row.NFCeCancelada), "N")
+	hasError := strings.TrimSpace(row.StatusErro) != ""
+	isOffline := strings.EqualFold(strings.TrimSpace(row.NFCeOffline), "S") || strings.TrimSpace(row.DHCont) != ""
+	hasNumero := row.NumNFCe != nil && *row.NumNFCe > 0
+	hasKey := strings.TrimSpace(row.ChaveAcesso) != ""
+
+	if !(hasNumero || hasKey) {
+		return "IGNORADA"
+	}
+	if isCanceled {
+		return "CANCELADA"
+	}
+	if hasProtocol {
+		return "AUTORIZADA"
+	}
+	if hasError {
+		return "REJEITADA"
+	}
+	if isOffline {
+		return "CONTINGENCIA_PENDENTE"
+	}
+	if hasNumero {
+		return "PENDENTE_TRANSMISSAO"
+	}
+	return "IGNORADA"
 }
 
 func getString(values map[string]any, key string) string {

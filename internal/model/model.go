@@ -45,13 +45,21 @@ type ResumoResponse struct {
 	ValorTotalContingencia    float64 `json:"valor_total_contingencia"`
 	ValorTotalSemFiscal       float64 `json:"valor_total_sem_fiscal"`
 	ValorTotalPendente        float64 `json:"valor_total_pendente"`
+	ValorBaseICMS             float64 `json:"valor_base_icms"`
+	ValorICMS                 float64 `json:"valor_icms"`
+	ValorPIS                  float64 `json:"valor_pis"`
+	ValorCOFINS               float64 `json:"valor_cofins"`
+	ValorImpostoFederal       float64 `json:"valor_imposto_federal"`
+	ValorImpostoEstadual      float64 `json:"valor_imposto_estadual"`
 }
 
 type NFCeListItem struct {
 	SourceID          int32    `json:"source_id"`
 	InstalacaoID      string   `json:"instalacao_id"`
+	GrupoConferencia  string   `json:"grupo_conferencia"`
 	DataVenda         *string  `json:"data_venda,omitempty"`
 	HoraVenda         string   `json:"hora_venda"`
+	DataTransmissao   *string  `json:"data_transmissao,omitempty"`
 	NumeroNFCe        *int32   `json:"num_nfce,omitempty"`
 	SerieNFCe         *int32   `json:"serie_nfce,omitempty"`
 	ChaveAcesso       string   `json:"chave_acesso"`
@@ -61,6 +69,12 @@ type NFCeListItem struct {
 	NFCeOffline       string   `json:"nfce_offline"`
 	NFCeCancelada     string   `json:"nfce_cancelada"`
 	ValorDocumento    *float64 `json:"valor_documento,omitempty"`
+	BaseICMS          *float64 `json:"base_icms,omitempty"`
+	ICMS              *float64 `json:"icms,omitempty"`
+	PIS               *float64 `json:"pis,omitempty"`
+	COFINS            *float64 `json:"cofins,omitempty"`
+	ImpostoFederal    *float64 `json:"imposto_federal,omitempty"`
+	ImpostoEstadual   *float64 `json:"imposto_estadual,omitempty"`
 	NomeCliente       string   `json:"nome_cliente"`
 	DocumentoCliente  string   `json:"documento_cliente"`
 }

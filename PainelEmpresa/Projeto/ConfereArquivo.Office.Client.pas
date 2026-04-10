@@ -20,13 +20,21 @@ type
     ValorTotalContingencia: Currency;
     ValorTotalSemFiscal: Currency;
     ValorTotalPendente: Currency;
+    ValorBaseICMS: Currency;
+    ValorICMS: Currency;
+    ValorPIS: Currency;
+    ValorCOFINS: Currency;
+    ValorImpostoFederal: Currency;
+    ValorImpostoEstadual: Currency;
   end;
 
   TConfereNotaConsulta = record
     SourceID: Integer;
     InstalacaoID: string;
+    GrupoConferencia: string;
     DataVenda: string;
     HoraVenda: string;
+    DataTransmissao: string;
     NumeroNFCe: string;
     SerieNFCe: string;
     ChaveAcesso: string;
@@ -36,6 +44,12 @@ type
     NFCeOffline: string;
     NFCeCancelada: string;
     ValorDocumento: Currency;
+    BaseICMS: Currency;
+    ICMS: Currency;
+    PIS: Currency;
+    COFINS: Currency;
+    ImpostoFederal: Currency;
+    ImpostoEstadual: Currency;
     NomeCliente: string;
     DocumentoCliente: string;
   end;
@@ -172,6 +186,12 @@ begin
     Result.ValorTotalContingencia := JsonToCurrency(Json.GetValue('valor_total_contingencia').Value);
     Result.ValorTotalSemFiscal := JsonToCurrency(Json.GetValue('valor_total_sem_fiscal').Value);
     Result.ValorTotalPendente := JsonToCurrency(Json.GetValue('valor_total_pendente').Value);
+    Result.ValorBaseICMS := JsonToCurrency(Json.GetValue('valor_base_icms').Value);
+    Result.ValorICMS := JsonToCurrency(Json.GetValue('valor_icms').Value);
+    Result.ValorPIS := JsonToCurrency(Json.GetValue('valor_pis').Value);
+    Result.ValorCOFINS := JsonToCurrency(Json.GetValue('valor_cofins').Value);
+    Result.ValorImpostoFederal := JsonToCurrency(Json.GetValue('valor_imposto_federal').Value);
+    Result.ValorImpostoEstadual := JsonToCurrency(Json.GetValue('valor_imposto_estadual').Value);
   finally
     Json.Free;
   end;
@@ -210,8 +230,10 @@ begin
         FillChar(Item, SizeOf(Item), 0);
         Item.SourceID := ItemObj.GetValue<Integer>('source_id', 0);
         Item.InstalacaoID := ItemObj.GetValue<string>('instalacao_id', '');
+        Item.GrupoConferencia := ItemObj.GetValue<string>('grupo_conferencia', '');
         Item.DataVenda := ItemObj.GetValue<string>('data_venda', '');
         Item.HoraVenda := ItemObj.GetValue<string>('hora_venda', '');
+        Item.DataTransmissao := ItemObj.GetValue<string>('data_transmissao', '');
         Item.NumeroNFCe := ItemObj.GetValue<string>('num_nfce', '');
         Item.SerieNFCe := ItemObj.GetValue<string>('serie_nfce', '');
         Item.ChaveAcesso := ItemObj.GetValue<string>('chave_acesso', '');
@@ -222,6 +244,18 @@ begin
         Item.NFCeCancelada := ItemObj.GetValue<string>('nfce_cancelada', '');
         if Assigned(ItemObj.GetValue('valor_documento')) then
           Item.ValorDocumento := JsonToCurrency(ItemObj.GetValue('valor_documento').Value);
+        if Assigned(ItemObj.GetValue('base_icms')) then
+          Item.BaseICMS := JsonToCurrency(ItemObj.GetValue('base_icms').Value);
+        if Assigned(ItemObj.GetValue('icms')) then
+          Item.ICMS := JsonToCurrency(ItemObj.GetValue('icms').Value);
+        if Assigned(ItemObj.GetValue('pis')) then
+          Item.PIS := JsonToCurrency(ItemObj.GetValue('pis').Value);
+        if Assigned(ItemObj.GetValue('cofins')) then
+          Item.COFINS := JsonToCurrency(ItemObj.GetValue('cofins').Value);
+        if Assigned(ItemObj.GetValue('imposto_federal')) then
+          Item.ImpostoFederal := JsonToCurrency(ItemObj.GetValue('imposto_federal').Value);
+        if Assigned(ItemObj.GetValue('imposto_estadual')) then
+          Item.ImpostoEstadual := JsonToCurrency(ItemObj.GetValue('imposto_estadual').Value);
         Item.NomeCliente := ItemObj.GetValue<string>('nome_cliente', '');
         Item.DocumentoCliente := ItemObj.GetValue<string>('documento_cliente', '');
         List.Add(Item);

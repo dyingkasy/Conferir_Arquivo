@@ -328,12 +328,54 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Height = 15
         Caption = 'Valor contingencia'
       end
-      object lblValorSemFiscal: TLabel
-        Left = 552
-        Top = 68
-        Width = 76
+    object lblValorSemFiscal: TLabel
+      Left = 552
+      Top = 68
+      Width = 76
+      Height = 15
+      Caption = 'Valor sem fiscal'
+    end
+      object lblTribBase: TLabel
+        Left = 732
+        Top = 24
+        Width = 58
         Height = 15
-        Caption = 'Valor sem fiscal'
+        Caption = 'Base ICMS'
+      end
+      object lblTribICMS: TLabel
+        Left = 732
+        Top = 68
+        Width = 29
+        Height = 15
+        Caption = 'ICMS'
+      end
+      object lblTribPIS: TLabel
+        Left = 828
+        Top = 24
+        Width = 18
+        Height = 15
+        Caption = 'PIS'
+      end
+      object lblTribCOFINS: TLabel
+        Left = 828
+        Top = 68
+        Width = 42
+        Height = 15
+        Caption = 'COFINS'
+      end
+      object lblTribFederal: TLabel
+        Left = 924
+        Top = 24
+        Width = 75
+        Height = 15
+        Caption = 'Imp. Federal'
+      end
+      object lblTribEstadual: TLabel
+        Left = 924
+        Top = 68
+        Width = 80
+        Height = 15
+        Caption = 'Imp. Estadual'
       end
       object edTotal: TEdit
         Left = 12
@@ -415,6 +457,54 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         ReadOnly = True
         TabOrder = 9
       end
+      object edTribBase: TEdit
+        Left = 732
+        Top = 40
+        Width = 84
+        Height = 23
+        ReadOnly = True
+        TabOrder = 10
+      end
+      object edTribICMS: TEdit
+        Left = 732
+        Top = 84
+        Width = 84
+        Height = 23
+        ReadOnly = True
+        TabOrder = 11
+      end
+      object edTribPIS: TEdit
+        Left = 828
+        Top = 40
+        Width = 84
+        Height = 23
+        ReadOnly = True
+        TabOrder = 12
+      end
+      object edTribCOFINS: TEdit
+        Left = 828
+        Top = 84
+        Width = 84
+        Height = 23
+        ReadOnly = True
+        TabOrder = 13
+      end
+      object edTribFederal: TEdit
+        Left = 924
+        Top = 40
+        Width = 84
+        Height = 23
+        ReadOnly = True
+        TabOrder = 14
+      end
+      object edTribEstadual: TEdit
+        Left = 924
+        Top = 84
+        Width = 84
+        Height = 23
+        ReadOnly = True
+        TabOrder = 15
+      end
     end
     object mmLog: TMemo
       Left = 8
@@ -438,6 +528,7 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
       RowCount = 2
       Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goColSizing, goRowSelect]
       TabOrder = 2
+      OnDrawCell = sgNotasDrawCell
     end
   end
 end
