@@ -226,19 +226,25 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Style = csDropDownList
         TabOrder = 0
       end
-      object edDataInicial: TEdit
+      object dtDataInicial: TDateTimePicker
         Left = 238
         Top = 40
         Width = 96
         Height = 23
+        Date = 46022.000000000000000000
+        Time = 0.000000000000000000
+        Kind = dtkDate
         TabOrder = 1
       end
-      object edDataFinal: TEdit
+      object dtDataFinal: TDateTimePicker
         Left = 352
         Top = 40
         Width = 96
         Height = 23
-        TabOrder = 2
+        Date = 46022.000000000000000000
+        Time = 0.000000000000000000
+        Kind = dtkDate
+        TabOrder = 1
       end
       object edDias: TEdit
         Left = 466
@@ -293,19 +299,12 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Height = 15
         Caption = 'Sem fiscal'
       end
-      object lblRejeitadas: TLabel
+      object lblErro: TLabel
         Left = 372
         Top = 24
-        Width = 56
+        Width = 26
         Height = 15
-        Caption = 'Rejeitadas'
-      end
-      object lblCanceladas: TLabel
-        Left = 462
-        Top = 24
-        Width = 60
-        Height = 15
-        Caption = 'Canceladas'
+        Caption = 'Erro'
       end
       object lblValorTotal: TLabel
         Left = 12
@@ -328,13 +327,20 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Height = 15
         Caption = 'Valor contingencia'
       end
-    object lblValorSemFiscal: TLabel
-      Left = 552
-      Top = 68
-      Width = 76
-      Height = 15
-      Caption = 'Valor sem fiscal'
-    end
+      object lblValorSemFiscal: TLabel
+        Left = 552
+        Top = 68
+        Width = 76
+        Height = 15
+        Caption = 'Valor sem fiscal'
+      end
+      object lblValorErro: TLabel
+        Left = 732
+        Top = 68
+        Width = 53
+        Height = 15
+        Caption = 'Valor erro'
+      end
       object edTotal: TEdit
         Left = 12
         Top = 40
@@ -367,21 +373,13 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         ReadOnly = True
         TabOrder = 3
       end
-      object edRejeitadas: TEdit
+      object edErro: TEdit
         Left = 372
         Top = 40
         Width = 74
         Height = 23
         ReadOnly = True
         TabOrder = 4
-      end
-      object edCanceladas: TEdit
-        Left = 462
-        Top = 40
-        Width = 74
-        Height = 23
-        ReadOnly = True
-        TabOrder = 5
       end
       object edValorTotal: TEdit
         Left = 12
@@ -414,6 +412,14 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Height = 23
         ReadOnly = True
         TabOrder = 9
+      end
+      object edValorErro: TEdit
+        Left = 732
+        Top = 84
+        Width = 160
+        Height = 23
+        ReadOnly = True
+        TabOrder = 10
       end
     end
     object gbTributos: TGroupBox

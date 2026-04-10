@@ -218,18 +218,15 @@ func (p *Postgres) GetResumo(ctx context.Context, cnpj, token string, dias int) 
 	err := p.pool.QueryRow(ctx, `
 		select
 			count(*)::bigint,
-			count(*) filter (where (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') <> '' or data_autorizacao is not null))::bigint,
-			count(*) filter (where (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') <> '' or data_autorizacao is not null))::bigint,
-			count(*) filter (where (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S'))::bigint,
-			count(*) filter (where (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') = '' and data_autorizacao is null))::bigint,
-			count(*) filter (where (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') = '' and data_autorizacao is null) and coalesce(dhcont, '') = '' and upper(coalesce(nfce_offline, 'N')) <> 'S')::bigint,
-			count(*) filter (where (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and status_operacional = 'REJEITADA')::bigint,
-			count(*) filter (where coalesce(nfce_cancelada, '') <> '' and upper(coalesce(nfce_cancelada, 'N')) <> 'N')::bigint,
+			count(*) filter (where (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and coalesce(status_erro, '') = '' and (coalesce(protocolo, '') <> '' or data_autorizacao is not null) and upper(coalesce(status_venda, '')) = 'F')::bigint,
+			count(*) filter (where (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and coalesce(status_erro, '') = '' and (coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S'))::bigint,
+			count(*) filter (where (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and coalesce(status_erro, '') = '' and (coalesce(protocolo, '') = '' and data_autorizacao is null) and coalesce(dhcont, '') = '' and upper(coalesce(nfce_offline, 'N')) <> 'S')::bigint,
+			count(*) filter (where ((coalesce(nfce_cancelada, '') <> '' and upper(coalesce(nfce_cancelada, 'N')) <> 'N') or coalesce(status_erro, '') <> ''))::bigint,
 			coalesce(sum(total_documento), 0)::float8,
-			coalesce(sum(case when (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') <> '' or data_autorizacao is not null) then total_documento else 0 end), 0)::float8,
-			coalesce(sum(case when (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S') then total_documento else 0 end), 0)::float8,
-			coalesce(sum(case when (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') = '' and data_autorizacao is null) and coalesce(dhcont, '') = '' and upper(coalesce(nfce_offline, 'N')) <> 'S' then total_documento else 0 end), 0)::float8,
-			coalesce(sum(case when (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') = '' and data_autorizacao is null) then total_documento else 0 end), 0)::float8,
+			coalesce(sum(case when (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and coalesce(status_erro, '') = '' and (coalesce(protocolo, '') <> '' or data_autorizacao is not null) and upper(coalesce(status_venda, '')) = 'F' then total_documento else 0 end), 0)::float8,
+			coalesce(sum(case when (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and coalesce(status_erro, '') = '' and (coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S') then total_documento else 0 end), 0)::float8,
+			coalesce(sum(case when (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and coalesce(status_erro, '') = '' and (coalesce(protocolo, '') = '' and data_autorizacao is null) and coalesce(dhcont, '') = '' and upper(coalesce(nfce_offline, 'N')) <> 'S' then total_documento else 0 end), 0)::float8,
+			coalesce(sum(case when ((coalesce(nfce_cancelada, '') <> '' and upper(coalesce(nfce_cancelada, 'N')) <> 'N') or coalesce(status_erro, '') <> '') then total_documento else 0 end), 0)::float8,
 			coalesce(sum(base_icms), 0)::float8,
 			coalesce(sum(icms), 0)::float8,
 			coalesce(sum(pis), 0)::float8,
@@ -242,17 +239,14 @@ func (p *Postgres) GetResumo(ctx context.Context, cnpj, token string, dias int) 
 	`, cnpj, dias).Scan(
 		&resp.QuantidadeTotal,
 		&resp.QuantidadeTransmitida,
-		&resp.QuantidadeAutorizada,
 		&resp.QuantidadeContingencia,
-		&resp.QuantidadePendente,
 		&resp.QuantidadeSemFiscal,
-		&resp.QuantidadeRejeitada,
-		&resp.QuantidadeCancelada,
+		&resp.QuantidadeErro,
 		&resp.ValorTotalDocumento,
 		&resp.ValorTotalTransmitido,
 		&resp.ValorTotalContingencia,
 		&resp.ValorTotalSemFiscal,
-		&resp.ValorTotalPendente,
+		&resp.ValorTotalErro,
 		&resp.ValorBaseICMS,
 		&resp.ValorICMS,
 		&resp.ValorPIS,
@@ -313,9 +307,9 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 	baseSQL := `
 		select source_id, instalacao_id,
 		       case
-		         when coalesce(nfce_cancelada, '') <> '' and upper(coalesce(nfce_cancelada, 'N')) <> 'N' then 'CANCELADA'
-		         when (coalesce(protocolo, '') <> '' or data_autorizacao is not null) then 'TRANSMITIDA'
-		         when ((coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S')) then 'CONTINGENCIA'
+		         when ((coalesce(nfce_cancelada, '') <> '' and upper(coalesce(nfce_cancelada, 'N')) <> 'N') or coalesce(status_erro, '') <> '') then 'ERRO'
+		         when (coalesce(protocolo, '') <> '' or data_autorizacao is not null) and upper(coalesce(status_venda, '')) = 'F' then 'TRANSMITIDA'
+		         when coalesce(status_erro, '') = '' and ((coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S')) then 'CONTINGENCIA'
 		         else 'SEM_FISCAL'
 		       end as grupo_conferencia,
 		       data_venda, hora_venda, data_autorizacao, num_nfce, serie_nfce, chave_acesso, protocolo,
@@ -330,13 +324,13 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 		status = strings.ToUpper(strings.TrimSpace(status))
 		switch status {
 		case "TRANSMITIDA":
-			baseSQL += " and (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') <> '' or data_autorizacao is not null)"
+			baseSQL += " and (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and coalesce(status_erro, '') = '' and (coalesce(protocolo, '') <> '' or data_autorizacao is not null) and upper(coalesce(status_venda, '')) = 'F'"
 		case "CONTINGENCIA":
-			baseSQL += " and (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S')"
+			baseSQL += " and (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and coalesce(status_erro, '') = '' and (coalesce(protocolo, '') = '' and data_autorizacao is null) and (coalesce(dhcont, '') <> '' or upper(coalesce(nfce_offline, 'N')) = 'S')"
 		case "SEM_FISCAL":
-			baseSQL += " and (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and (coalesce(protocolo, '') = '' and data_autorizacao is null) and coalesce(dhcont, '') = '' and upper(coalesce(nfce_offline, 'N')) <> 'S'"
-		case "CANCELADA":
-			baseSQL += " and coalesce(nfce_cancelada, '') <> '' and upper(coalesce(nfce_cancelada, 'N')) <> 'N'"
+			baseSQL += " and (coalesce(nfce_cancelada, '') = '' or upper(coalesce(nfce_cancelada, 'N')) = 'N') and coalesce(status_erro, '') = '' and (coalesce(protocolo, '') = '' and data_autorizacao is null) and coalesce(dhcont, '') = '' and upper(coalesce(nfce_offline, 'N')) <> 'S'"
+		case "ERRO":
+			baseSQL += " and ((coalesce(nfce_cancelada, '') <> '' and upper(coalesce(nfce_cancelada, 'N')) <> 'N') or coalesce(status_erro, '') <> '')"
 		default:
 			baseSQL += fmt.Sprintf(" and status_operacional = $%d", argPos)
 			args = append(args, status)

@@ -5,6 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, System.Math,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  Vcl.ComCtrls,
   Vcl.Grids, ConfereArquivo.Office.Config, ConfereArquivo.Office.Client;
 
 type
@@ -33,8 +34,8 @@ type
     lblDataFinal: TLabel;
     lblDias: TLabel;
     cbStatus: TComboBox;
-    edDataInicial: TEdit;
-    edDataFinal: TEdit;
+    dtDataInicial: TDateTimePicker;
+    dtDataFinal: TDateTimePicker;
     edDias: TEdit;
     btnConsultar: TButton;
     gbResumo: TGroupBox;
@@ -43,8 +44,7 @@ type
     lblTransmitidas: TLabel;
     lblContingencia: TLabel;
     lblSemFiscal: TLabel;
-    lblRejeitadas: TLabel;
-    lblCanceladas: TLabel;
+    lblErro: TLabel;
     lblValorTotal: TLabel;
     lblValorTransmitido: TLabel;
     lblValorCont: TLabel;
@@ -59,12 +59,13 @@ type
     edTransmitidas: TEdit;
     edContingencia: TEdit;
     edSemFiscal: TEdit;
-    edRejeitadas: TEdit;
-    edCanceladas: TEdit;
+    edErro: TEdit;
     edValorTotal: TEdit;
     edValorTransmitido: TEdit;
     edValorCont: TEdit;
     edValorSemFiscal: TEdit;
+    edValorErro: TEdit;
+    lblValorErro: TLabel;
     edTribBase: TEdit;
     edTribICMS: TEdit;
     edTribPIS: TEdit;
@@ -86,6 +87,7 @@ type
     FConfig: TConfereOfficeConfig;
     FEmpresas: TArray<TConfereEmpresaDisponivel>;
     FVisibleEmpresas: TArray<Integer>;
+    function FriendlyStatus(const AGrupo, AStatus: string): string;
     procedure ApplyVisualStyle;
     procedure StyleReadOnlyEdit(AEdit: TEdit; const AColor: TColor);
     procedure StyleButton(AButton: TButton; const AColor: TColor; AFontColor: TColor = clWhite);
@@ -171,12 +173,12 @@ begin
   StyleReadOnlyEdit(edTransmitidas, $00E6F5E8);
   StyleReadOnlyEdit(edContingencia, $00FFF0D9);
   StyleReadOnlyEdit(edSemFiscal, $00FBE7D8);
-  StyleReadOnlyEdit(edRejeitadas, $00FCE4E4);
-  StyleReadOnlyEdit(edCanceladas, $00F1E6EA);
+  StyleReadOnlyEdit(edErro, $00FCE4E4);
   StyleReadOnlyEdit(edValorTotal, $00F2F4F7);
   StyleReadOnlyEdit(edValorTransmitido, $00E6F5E8);
   StyleReadOnlyEdit(edValorCont, $00FFF0D9);
   StyleReadOnlyEdit(edValorSemFiscal, $00FBE7D8);
+  StyleReadOnlyEdit(edValorErro, $00FCE4E4);
 
   StyleReadOnlyEdit(edTribBase, $00EAF0F7);
   StyleReadOnlyEdit(edTribICMS, $00EAF0F7);
@@ -200,10 +202,10 @@ begin
   edApi.Text := FConfig.ApiBaseUrl;
   edToken.Text := FConfig.ApiToken;
   edDias.Text := FConfig.DiasResumo.ToString;
-  cbStatus.Items.Text := 'TODOS'#13#10'TRANSMITIDA'#13#10'CONTINGENCIA'#13#10'SEM_FISCAL'#13#10'AUTORIZADA'#13#10'CONTINGENCIA_AUTORIZADA'#13#10'CONTINGENCIA_PENDENTE'#13#10'PENDENTE_TRANSMISSAO'#13#10'REJEITADA'#13#10'CANCELADA';
+  cbStatus.Items.Text := 'TODOS'#13#10'TRANSMITIDA'#13#10'CONTINGENCIA'#13#10'ERRO'#13#10'SEM_FISCAL';
   cbStatus.ItemIndex := 0;
-  edDataInicial.Text := FormatDateTime('yyyy-mm-dd', Date - 7);
-  edDataFinal.Text := FormatDateTime('yyyy-mm-dd', Date);
+  dtDataInicial.Date := Date - 7;
+  dtDataFinal.Date := Date;
   edEmpresaFiltro.Text := '';
 end;
 
@@ -230,7 +232,7 @@ begin
   sgNotas.Cells[0,0] := 'Data';
   sgNotas.Cells[1,0] := 'Hora';
   sgNotas.Cells[2,0] := 'Grupo';
-  sgNotas.Cells[3,0] := 'Status';
+  sgNotas.Cells[3,0] := 'Status Final';
   sgNotas.Cells[4,0] := 'Transm.';
   sgNotas.Cells[5,0] := 'Numero';
   sgNotas.Cells[6,0] := 'Serie';
@@ -255,6 +257,35 @@ begin
   sgNotas.ColWidths[11] := 210;
   sgNotas.ColWidths[12] := 108;
   sgNotas.ColWidths[13] := 148;
+end;
+
+function TFrmConfereArquivoOfficeMain.FriendlyStatus(const AGrupo,
+  AStatus: string): string;
+var
+  Grupo, Status: string;
+begin
+  Grupo := UpperCase(Trim(AGrupo));
+  Status := UpperCase(Trim(AStatus));
+
+  if Grupo = 'TRANSMITIDA' then
+    Exit('AUTORIZADA');
+  if Grupo = 'CONTINGENCIA' then
+    Exit('CONTINGENCIA');
+  if Grupo = 'SEM_FISCAL' then
+    Exit('SEM FISCAL');
+  if Grupo = 'ERRO' then
+    Exit('ERRO');
+
+  if Status = 'CONTINGENCIA_AUTORIZADA' then
+    Exit('AUTORIZADA');
+  if Status = 'CONTINGENCIA_PENDENTE' then
+    Exit('CONTINGENCIA');
+  if Status = 'PENDENTE_TRANSMISSAO' then
+    Exit('SEM FISCAL');
+  if (Status = 'REJEITADA') or (Status = 'CANCELADA') then
+    Exit('ERRO');
+
+  Result := Trim(AStatus);
 end;
 
 procedure TFrmConfereArquivoOfficeMain.Log(const AText: string);
@@ -332,12 +363,12 @@ begin
     edTransmitidas.Text := IntToStr(Resumo.QuantidadeTransmitida);
     edContingencia.Text := IntToStr(Resumo.QuantidadeContingencia);
     edSemFiscal.Text := IntToStr(Resumo.QuantidadeSemFiscal);
-    edRejeitadas.Text := IntToStr(Resumo.QuantidadeRejeitada);
-    edCanceladas.Text := IntToStr(Resumo.QuantidadeCancelada);
+    edErro.Text := IntToStr(Resumo.QuantidadeErro);
     edValorTotal.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalDocumento);
     edValorTransmitido.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalTransmitido);
     edValorCont.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalContingencia);
     edValorSemFiscal.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalSemFiscal);
+    edValorErro.Text := FormatFloat('R$ ,0.00', Resumo.ValorTotalErro);
     edTribBase.Text := FormatFloat('R$ ,0.00', Resumo.ValorBaseICMS);
     edTribICMS.Text := FormatFloat('R$ ,0.00', Resumo.ValorICMS);
     edTribPIS.Text := FormatFloat('R$ ,0.00', Resumo.ValorPIS);
@@ -361,14 +392,19 @@ begin
     StatusValue := '';
     if cbStatus.ItemIndex > 0 then
       StatusValue := cbStatus.Text;
-    Items := Client.LoadLista(FConfig.CNPJEmpresa, StatusValue, Trim(edDataInicial.Text), Trim(edDataFinal.Text), 250);
+    Items := Client.LoadLista(
+      FConfig.CNPJEmpresa,
+      StatusValue,
+      FormatDateTime('yyyy-mm-dd', dtDataInicial.Date),
+      FormatDateTime('yyyy-mm-dd', dtDataFinal.Date),
+      250);
     sgNotas.RowCount := Max(Length(Items) + 1, 2);
     for I := 0 to Length(Items) - 1 do
     begin
       sgNotas.Cells[0, I + 1] := Items[I].DataVenda;
       sgNotas.Cells[1, I + 1] := Items[I].HoraVenda;
       sgNotas.Cells[2, I + 1] := Items[I].GrupoConferencia;
-      sgNotas.Cells[3, I + 1] := Items[I].StatusOperacional;
+      sgNotas.Cells[3, I + 1] := FriendlyStatus(Items[I].GrupoConferencia, Items[I].StatusOperacional);
       sgNotas.Cells[4, I + 1] := Items[I].DataTransmissao;
       sgNotas.Cells[5, I + 1] := Items[I].NumeroNFCe;
       sgNotas.Cells[6, I + 1] := Items[I].SerieNFCe;
@@ -463,6 +499,11 @@ begin
     begin
       FillColor := $00EEF4FF;
       FontColor := $00694A00;
+    end
+    else if Text = 'ERRO' then
+    begin
+      FillColor := $00FCE4E4;
+      FontColor := $007A2020;
     end
     else
     begin
