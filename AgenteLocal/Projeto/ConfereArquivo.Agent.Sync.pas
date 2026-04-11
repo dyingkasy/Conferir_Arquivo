@@ -3,21 +3,35 @@ unit ConfereArquivo.Agent.Sync;
 interface
 
 uses
-  System.SysUtils,
+  System.SysUtils, System.Generics.Collections,
   ConfereArquivo.Agent.Config, ConfereArquivo.Agent.Source,
   ConfereArquivo.Agent.Queue, ConfereArquivo.Types;
 
 type
+  TConfereSyncContext = class
+  public
+    Config: TConfereAgentConfig;
+    SourceName: string;
+    Source: TConfereAgentSource;
+    Queue: TConfereAgentQueue;
+    Empresa: TConfereEmpresaInfo;
+    EmpresaLoaded: Boolean;
+    constructor Create(const AConfig: TConfereAgentConfig; const ASourceName: string;
+      ASource: TConfereAgentSource; AQueue: TConfereAgentQueue);
+    destructor Destroy; override;
+  end;
+
   TConfereSyncEngine = class
   private
     FConfig: TConfereAgentConfig;
-    FSource: TConfereAgentSource;
-    FQueue: TConfereAgentQueue;
-    FEmpresa: TConfereEmpresaInfo;
+    FContexts: TObjectList<TConfereSyncContext>;
     FLastMessage: string;
-    procedure EnsureEmpresaLoaded;
-    procedure SendPending;
+    procedure BuildContexts;
+    procedure EnsureEmpresaLoaded(AContext: TConfereSyncContext);
+    procedure SendPending(AContext: TConfereSyncContext);
     function BuildLoteUrl: string;
+    function BuildQueueDatabasePath(const ASourcePath: string): string;
+    function BuildContextSummary: string;
   public
     constructor Create(const AConfig: TConfereAgentConfig);
     destructor Destroy; override;
@@ -33,28 +47,104 @@ type
 implementation
 
 uses
-  System.Classes, System.JSON, System.StrUtils, System.Net.URLClient, System.Net.HttpClient,
-  System.Net.HttpClientComponent, ConfereArquivo.Json, ConfereArquivo.Logger;
+  System.Classes, System.JSON, System.StrUtils, System.Hash,
+  System.Net.URLClient, System.Net.HttpClient, System.Net.HttpClientComponent,
+  ConfereArquivo.Json, ConfereArquivo.Logger;
+
+constructor TConfereSyncContext.Create(const AConfig: TConfereAgentConfig;
+  const ASourceName: string; ASource: TConfereAgentSource; AQueue: TConfereAgentQueue);
+begin
+  inherited Create;
+  Config := AConfig;
+  SourceName := ASourceName;
+  Source := ASource;
+  Queue := AQueue;
+  EmpresaLoaded := False;
+end;
+
+destructor TConfereSyncContext.Destroy;
+begin
+  Queue.Free;
+  Source.Free;
+  inherited Destroy;
+end;
 
 constructor TConfereSyncEngine.Create(const AConfig: TConfereAgentConfig);
 begin
   inherited Create;
   FConfig := AConfig;
-  FSource := TConfereAgentSource.Create(FConfig);
-  FQueue := TConfereAgentQueue.Create(FConfig.QueueDatabasePath);
-  FQueue.EnsureSchema;
+  FContexts := TObjectList<TConfereSyncContext>.Create(True);
+  BuildContexts;
 end;
 
 destructor TConfereSyncEngine.Destroy;
 begin
-  FQueue.Free;
-  FSource.Free;
+  FContexts.Free;
   inherited Destroy;
 end;
 
-function TConfereSyncEngine.Validate(out AMessage: string): Boolean;
+function TConfereSyncEngine.BuildQueueDatabasePath(const ASourcePath: string): string;
+var
+  Hash: string;
 begin
-  Result := FSource.Validate(AMessage);
+  Hash := LowerCase(Copy(THashMD5.GetHashString(LowerCase(Trim(ExpandFileName(ASourcePath)))), 1, 12));
+  Result := IncludeTrailingPathDelimiter(FConfig.AppRoot) + 'Config\ConfereArquivoQueue_' + Hash + '.sqlite';
+end;
+
+procedure TConfereSyncEngine.BuildContexts;
+var
+  Path: string;
+  ContextConfig: TConfereAgentConfig;
+  Source: TConfereAgentSource;
+  Queue: TConfereAgentQueue;
+begin
+  FContexts.Clear;
+  for Path in FConfig.SourceDatabasePaths do
+  begin
+    ContextConfig := FConfig;
+    ContextConfig.SourceDatabasePath := Path;
+    ContextConfig.QueueDatabasePath := BuildQueueDatabasePath(Path);
+    Source := TConfereAgentSource.Create(ContextConfig);
+    Queue := TConfereAgentQueue.Create(ContextConfig.QueueDatabasePath);
+    Queue.EnsureSchema;
+    FContexts.Add(TConfereSyncContext.Create(ContextConfig, ExtractFileName(Path), Source, Queue));
+  end;
+end;
+
+function TConfereSyncEngine.Validate(out AMessage: string): Boolean;
+var
+  Context: TConfereSyncContext;
+  Msg: string;
+  ValidCount: Integer;
+  Errors: TStringList;
+begin
+  Result := False;
+  AMessage := '';
+  if FContexts.Count = 0 then
+  begin
+    AMessage := 'Nenhum banco PAFECF configurado.';
+    Exit;
+  end;
+
+  ValidCount := 0;
+  Errors := TStringList.Create;
+  try
+    for Context in FContexts do
+    begin
+      if Context.Source.Validate(Msg) then
+        Inc(ValidCount)
+      else
+        Errors.Add(Context.Config.SourceDatabasePath + ' -> ' + Msg);
+    end;
+
+    Result := Errors.Count = 0;
+    if Result then
+      AMessage := Format('Bancos PAFECF validados com sucesso. Quantidade: %d', [ValidCount])
+    else
+      AMessage := 'Falhas encontradas:' + sLineBreak + Trim(Errors.Text);
+  finally
+    Errors.Free;
+  end;
 end;
 
 function TConfereSyncEngine.BuildLoteUrl: string;
@@ -81,11 +171,17 @@ var
   Resp: IHTTPResponse;
   Body: TJSONObject;
   Url: string;
+  Context: TConfereSyncContext;
+  Errors: TStringList;
 begin
   Result := False;
   AMessage := '';
+  if FContexts.Count = 0 then
+  begin
+    AMessage := 'Nenhum banco PAFECF configurado.';
+    Exit;
+  end;
 
-  EnsureEmpresaLoaded;
   Url := BuildLoteUrl;
   if Url = '' then
   begin
@@ -96,130 +192,184 @@ begin
   Url := StringReplace(Url, '/nfce/lote', '/agente/config-check', [rfIgnoreCase]);
 
   Client := TNetHTTPClient.Create(nil);
+  Errors := TStringList.Create;
   try
     Client.ConnectionTimeout := 8000;
     Client.ResponseTimeout := 12000;
     Client.ContentType := 'application/json';
     Client.CustomHeaders['Authorization'] := 'Bearer ' + Trim(FConfig.ApiToken);
 
-    Body := TJSONObject.Create;
-    try
-      Body.AddPair('cnpj_empresa', NormalizeDigits(FEmpresa.CNPJ));
-      Body.AddPair('instalacao_id', FConfig.InstalacaoID);
-      Body.AddPair('razao_social', FEmpresa.RazaoSocial);
-      Req := TStringStream.Create(Body.ToJSON, TEncoding.UTF8);
+    for Context in FContexts do
+    begin
+      EnsureEmpresaLoaded(Context);
+      Body := TJSONObject.Create;
       try
-        Resp := Client.Post(Url, Req);
-        Result := (Resp.StatusCode >= 200) and (Resp.StatusCode < 300);
-        if Result then
-          AMessage := 'Servidor validado com sucesso.'
-        else
-          AMessage := Format('Falha no servidor. HTTP %d %s', [Resp.StatusCode, Resp.StatusText]);
+        Body.AddPair('cnpj_empresa', NormalizeDigits(Context.Empresa.CNPJ));
+        Body.AddPair('instalacao_id', FConfig.InstalacaoID);
+        Body.AddPair('razao_social', Context.Empresa.RazaoSocial);
+        Req := TStringStream.Create(Body.ToJSON, TEncoding.UTF8);
+        try
+          Resp := Client.Post(Url, Req);
+          if not ((Resp.StatusCode >= 200) and (Resp.StatusCode < 300)) then
+            Errors.Add(Format('%s -> HTTP %d %s', [Context.SourceName, Resp.StatusCode, Resp.StatusText]));
+        finally
+          Req.Free;
+        end;
       finally
-        Req.Free;
+        Body.Free;
       end;
-    finally
-      Body.Free;
     end;
+
+    Result := Errors.Count = 0;
+    if Result then
+      AMessage := Format('Servidor validado com sucesso para %d banco(s).', [FContexts.Count])
+    else
+      AMessage := Trim(Errors.Text);
   except
     on E: Exception do
       AMessage := E.Message;
   end;
+  Errors.Free;
   Client.Free;
 end;
 
-procedure TConfereSyncEngine.EnsureEmpresaLoaded;
+procedure TConfereSyncEngine.EnsureEmpresaLoaded(AContext: TConfereSyncContext);
 begin
-  if FEmpresa.CNPJ <> '' then
+  if AContext.EmpresaLoaded and (AContext.Empresa.CNPJ <> '') then
     Exit;
 
-  if not FSource.LoadEmpresa(FEmpresa) then
-    raise Exception.Create('Nao foi possivel carregar ECF_EMPRESA.');
+  if not AContext.Source.LoadEmpresa(AContext.Empresa) then
+    raise Exception.CreateFmt('Nao foi possivel carregar ECF_EMPRESA em %s.', [AContext.SourceName]);
+
+  AContext.EmpresaLoaded := True;
+end;
+
+function TConfereSyncEngine.BuildContextSummary: string;
+var
+  Context: TConfereSyncContext;
+  Parts: TStringList;
+begin
+  Parts := TStringList.Create;
+  try
+    for Context in FContexts do
+    begin
+      EnsureEmpresaLoaded(Context);
+      if Context.Empresa.RazaoSocial <> '' then
+        Parts.Add(Context.Empresa.RazaoSocial + ' [' + Context.SourceName + ']')
+      else
+        Parts.Add(Context.SourceName);
+    end;
+
+    if Parts.Count = 0 then
+      Result := 'Nenhum banco configurado'
+    else if Parts.Count = 1 then
+      Result := Parts[0]
+    else
+      Result := Format('%d bancos ativos | %s', [Parts.Count, StringReplace(Parts.CommaText, ',', ' | ', [rfReplaceAll])]);
+  finally
+    Parts.Free;
+  end;
 end;
 
 procedure TConfereSyncEngine.PollNow;
 var
+  Context: TConfereSyncContext;
   LastCursor, MaxID: Integer;
   Items: TArray<TConfereNFCeRecord>;
   Item: TConfereNFCeRecord;
   Payload: TJSONObject;
+  TotalAnalyzed: Integer;
 begin
-  EnsureEmpresaLoaded;
-
-  LastCursor := FQueue.GetStateInt('last_cursor', 0);
-  MaxID := LastCursor;
-  Items := FSource.LoadChangedSales(LastCursor, FConfig.WindowDays);
-
-  for Item in Items do
+  TotalAnalyzed := 0;
+  for Context in FContexts do
   begin
-    if Item.SourceID > MaxID then
-      MaxID := Item.SourceID;
+    EnsureEmpresaLoaded(Context);
 
-    if FSource.IsSynced(Item) then
-      Continue;
+    LastCursor := Context.Queue.GetStateInt('last_cursor', 0);
+    MaxID := LastCursor;
+    Items := Context.Source.LoadChangedSales(LastCursor, FConfig.WindowDays);
+    Inc(TotalAnalyzed, Length(Items));
 
-    if not FQueue.ShouldEnqueue(Item) then
-      Continue;
+    for Item in Items do
+    begin
+      if Item.SourceID > MaxID then
+        MaxID := Item.SourceID;
 
-    Payload := BuildNFCeJson(FEmpresa, Item);
-    try
-      FQueue.Enqueue(Item, Payload.ToJSON);
-    finally
-      Payload.Free;
+      if Context.Source.IsSynced(Item) then
+        Continue;
+
+      if not Context.Queue.ShouldEnqueue(Item) then
+        Continue;
+
+      Payload := BuildNFCeJson(Context.Empresa, Item);
+      try
+        Context.Queue.Enqueue(Item, Payload.ToJSON);
+      finally
+        Payload.Free;
+      end;
     end;
+
+    if MaxID > LastCursor then
+      Context.Queue.SetStateInt('last_cursor', MaxID);
+
+    SendPending(Context);
   end;
 
-  if MaxID > LastCursor then
-    FQueue.SetStateInt('last_cursor', MaxID);
-
-  SendPending;
-  FLastMessage := Format('Coleta concluida. Registros analisados: %d | Pendentes: %d',
-    [Length(Items), FQueue.PendingCount]);
+  FLastMessage := Format('Coleta NFC-e concluida. Bancos: %d | Registros analisados: %d | Pendentes: %d',
+    [FContexts.Count, TotalAnalyzed, PendingCount]);
   ConfereLogOperational(FLastMessage);
 end;
 
 procedure TConfereSyncEngine.SyncTotal;
 var
   Msg: string;
+  Context: TConfereSyncContext;
   Items: TArray<TConfereNFCeRecord>;
   Item: TConfereNFCeRecord;
   Payload: TJSONObject;
-  MaxID: Integer;
+  MaxID, TotalLoaded: Integer;
 begin
-  EnsureEmpresaLoaded;
   if not ValidateApi(Msg) then
     raise Exception.Create('Provisionamento/API falhou: ' + Msg);
 
-  FQueue.ResetFullSync;
-  MaxID := 0;
-  Items := FSource.LoadChangedSales(0, 3650);
-  for Item in Items do
+  TotalLoaded := 0;
+  for Context in FContexts do
   begin
-    if Item.SourceID > MaxID then
-      MaxID := Item.SourceID;
+    EnsureEmpresaLoaded(Context);
+    Context.Queue.ResetFullSync;
+    MaxID := 0;
+    Items := Context.Source.LoadChangedSales(0, 3650);
+    Inc(TotalLoaded, Length(Items));
 
-    if FSource.IsSynced(Item) then
-      Continue;
+    for Item in Items do
+    begin
+      if Item.SourceID > MaxID then
+        MaxID := Item.SourceID;
 
-    Payload := BuildNFCeJson(FEmpresa, Item);
-    try
-      FQueue.Enqueue(Item, Payload.ToJSON);
-    finally
-      Payload.Free;
+      if Context.Source.IsSynced(Item) then
+        Continue;
+
+      Payload := BuildNFCeJson(Context.Empresa, Item);
+      try
+        Context.Queue.Enqueue(Item, Payload.ToJSON);
+      finally
+        Payload.Free;
+      end;
     end;
+
+    if MaxID > 0 then
+      Context.Queue.SetStateInt('last_cursor', MaxID);
+
+    while Context.Queue.PendingCount > 0 do
+      SendPending(Context);
   end;
 
-  if MaxID > 0 then
-    FQueue.SetStateInt('last_cursor', MaxID);
-
-  while FQueue.PendingCount > 0 do
-    SendPending;
-
-  FLastMessage := Format('Sync total concluido. Registros enviados: %d', [Length(Items)]);
+  FLastMessage := Format('Sync total NFC-e concluido. Bancos: %d | Registros avaliados: %d',
+    [FContexts.Count, TotalLoaded]);
   ConfereLogOperational(FLastMessage);
 end;
 
-procedure TConfereSyncEngine.SendPending;
+procedure TConfereSyncEngine.SendPending(AContext: TConfereSyncContext);
 var
   Client: TNetHTTPClient;
   Req: TStringStream;
@@ -229,7 +379,7 @@ var
   Item: TConfereQueueItem;
   Url: string;
 begin
-  Pending := FQueue.GetPending(100);
+  Pending := AContext.Queue.GetPending(100);
   if Length(Pending) = 0 then
     Exit;
 
@@ -248,7 +398,7 @@ begin
     Client.ContentType := 'application/json';
     Client.CustomHeaders['Authorization'] := 'Bearer ' + FConfig.ApiToken;
 
-    Batch := BuildLoteJson(FEmpresa.CNPJ, FConfig.InstalacaoID, Pending);
+    Batch := BuildLoteJson(AContext.Empresa.CNPJ, FConfig.InstalacaoID, Pending);
     try
       Req := TStringStream.Create(Batch.ToJSON, TEncoding.UTF8);
       try
@@ -257,16 +407,18 @@ begin
         begin
           for Item in Pending do
           begin
-            FQueue.MarkSent(Item.QueueID);
-            FSource.MarkAsSynced(Item.SourceID, Item.HashIncremento, '');
+            AContext.Queue.MarkSent(Item.QueueID);
+            AContext.Source.MarkAsSynced(Item.SourceID, Item.HashIncremento, '');
           end;
-          ConfereLogOperational(Format('Lote enviado com sucesso. Quantidade: %d', [Length(Pending)]));
+          ConfereLogOperational(Format('Lote enviado com sucesso. Banco: %s | Quantidade: %d',
+            [AContext.SourceName, Length(Pending)]));
         end
         else
         begin
           for Item in Pending do
-            FQueue.MarkFailed(Item.QueueID, Resp.StatusText);
-          ConfereLogError(Format('Falha no envio do lote. HTTP %d %s', [Resp.StatusCode, Resp.StatusText]));
+            AContext.Queue.MarkFailed(Item.QueueID, Resp.StatusText);
+          ConfereLogError(Format('Falha no envio do lote. Banco: %s | HTTP %d %s',
+            [AContext.SourceName, Resp.StatusCode, Resp.StatusText]));
         end;
       finally
         Req.Free;
@@ -278,24 +430,26 @@ begin
     on E: Exception do
     begin
       for Item in Pending do
-        FQueue.MarkFailed(Item.QueueID, E.Message);
-      ConfereLogError('Falha enviando lote HTTPS: ' + E.Message);
+        AContext.Queue.MarkFailed(Item.QueueID, E.Message);
+      ConfereLogError(Format('Falha enviando lote HTTPS. Banco: %s | %s',
+        [AContext.SourceName, E.Message]));
     end;
   end;
   Client.Free;
 end;
 
 function TConfereSyncEngine.PendingCount: Integer;
+var
+  Context: TConfereSyncContext;
 begin
-  Result := FQueue.PendingCount;
+  Result := 0;
+  for Context in FContexts do
+    Inc(Result, Context.Queue.PendingCount);
 end;
 
 function TConfereSyncEngine.EmpresaResumo: string;
 begin
-  EnsureEmpresaLoaded;
-  Result := Trim(FEmpresa.RazaoSocial);
-  if FEmpresa.CNPJ <> '' then
-    Result := Result + ' | ' + NormalizeDigits(FEmpresa.CNPJ);
+  Result := BuildContextSummary;
 end;
 
 end.

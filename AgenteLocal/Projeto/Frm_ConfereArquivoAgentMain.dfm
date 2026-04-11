@@ -44,9 +44,9 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object lblSubtitulo: TLabel
       Left = 20
       Top = 53
-      Width = 444
+      Width = 571
       Height = 17
-      Caption = 'Coleta NFC-e do PAFECF e envia o espelho fiscal para a API da VPS.'
+      Caption = 'Escopo atual: somente NFC-e. Coleta do PAFECF e envio do espelho fiscal para a API da VPS.'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = 15724527
       Font.Height = -13
@@ -59,15 +59,15 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     Left = 16
     Top = 104
     Width = 510
-    Height = 145
+    Height = 184
     Caption = 'Origem Firebird'
     TabOrder = 1
     object lblBanco: TLabel
       Left = 16
       Top = 33
-      Width = 92
+      Width = 170
       Height = 17
-      Caption = 'Banco PAFECF'
+      Caption = 'Bancos PAFECF / 1 caminho por linha'
     end
     object lblUsuario: TLabel
       Left = 16
@@ -83,23 +83,24 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
       Height = 17
       Caption = 'Senha'
     end
-    object edBanco: TEdit
+    object mmBancos: TMemo
       Left = 16
       Top = 52
       Width = 478
-      Height = 25
+      Height = 65
+      ScrollBars = ssVertical
       TabOrder = 0
     end
     object edUsuario: TEdit
       Left = 16
-      Top = 108
+      Top = 145
       Width = 225
       Height = 25
       TabOrder = 1
     end
     object edSenha: TEdit
       Left = 265
-      Top = 108
+      Top = 145
       Width = 229
       Height = 25
       PasswordChar = '*'
@@ -158,7 +159,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
   end
   object gbAgente: TGroupBox
     Left = 16
-    Top = 261
+    Top = 300
     Width = 1028
     Height = 116
     Caption = 'Controle do Agente'
@@ -194,10 +195,18 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object chkAtivo: TCheckBox
       Left = 294
       Top = 60
-      Width = 109
+      Width = 129
       Height = 17
-      Caption = 'Agente ativo'
+      Caption = 'Sync automatico'
       TabOrder = 2
+    end
+    object chkIniciarWindows: TCheckBox
+      Left = 294
+      Top = 83
+      Width = 197
+      Height = 17
+      Caption = 'Iniciar com o Windows'
+      TabOrder = 3
     end
     object btnSalvar: TButton
       Left = 437
@@ -205,7 +214,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
       Width = 105
       Height = 31
       Caption = 'Salvar'
-      TabOrder = 3
+      TabOrder = 4
       OnClick = btnSalvarClick
     end
     object btnValidarBanco: TButton
@@ -214,7 +223,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
       Width = 118
       Height = 31
       Caption = 'Validar Banco'
-      TabOrder = 4
+      TabOrder = 5
       OnClick = btnValidarBancoClick
     end
     object btnValidarApi: TButton
@@ -223,41 +232,23 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
       Width = 113
       Height = 31
       Caption = 'Validar API'
-      TabOrder = 5
-      OnClick = btnValidarApiClick
-    end
-    object btnColetarAgora: TButton
-      Left = 809
-      Top = 53
-      Width = 104
-      Height = 31
-      Caption = 'Coletar Agora'
       TabOrder = 6
-      OnClick = btnColetarAgoraClick
+      OnClick = btnValidarApiClick
     end
     object btnSyncTotal: TButton
       Left = 809
-      Top = 86
-      Width = 104
-      Height = 27
+      Top = 53
+      Width = 116
+      Height = 31
       Caption = 'Sync Total'
-      TabOrder = 11
+      TabOrder = 7
       OnClick = btnSyncTotalClick
     end
-    object btnIniciar: TButton
-      Left = 925
-      Top = 22
-      Width = 88
-      Height = 28
-      Caption = 'Iniciar'
-      TabOrder = 7
-      OnClick = btnIniciarClick
-    end
     object btnParar: TButton
-      Left = 925
-      Top = 56
-      Width = 88
-      Height = 28
+      Left = 937
+      Top = 53
+      Width = 76
+      Height = 31
       Caption = 'Parar'
       TabOrder = 8
       OnClick = btnPararClick
@@ -265,27 +256,18 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object btnAbrirLogs: TButton
       Left = 554
       Top = 86
-      Width = 118
+      Width = 243
       Height = 27
       Caption = 'Abrir Logs'
       TabOrder = 9
       OnClick = btnAbrirLogsClick
     end
-    object btnTestarTudo: TButton
-      Left = 684
-      Top = 86
-      Width = 113
-      Height = 27
-      Caption = 'Testar Tudo'
-      TabOrder = 10
-      OnClick = btnTestarTudoClick
-    end
   end
   object gbMonitor: TGroupBox
     Left = 16
-    Top = 389
+    Top = 428
     Width = 1028
-    Height = 295
+    Height = 256
     Caption = 'Monitor de Operacao'
     TabOrder = 4
     object lblEmpresa: TLabel

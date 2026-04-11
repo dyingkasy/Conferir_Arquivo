@@ -4,7 +4,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, Winapi.ShellAPI, System.SysUtils, System.Classes, System.Math, System.DateUtils,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.Menus,
+  System.Types, Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.Menus,
   ConfereArquivo.Agent.Config, ConfereArquivo.Agent.Sync;
 
 type
@@ -16,7 +16,7 @@ type
     lblBanco: TLabel;
     lblUsuario: TLabel;
     lblSenha: TLabel;
-    edBanco: TEdit;
+    mmBancos: TMemo;
     edUsuario: TEdit;
     edSenha: TEdit;
     gbServidor: TGroupBox;
@@ -32,15 +32,13 @@ type
     edtIntervalo: TEdit;
     edtJanela: TEdit;
     chkAtivo: TCheckBox;
+    chkIniciarWindows: TCheckBox;
     btnSalvar: TButton;
     btnValidarBanco: TButton;
     btnValidarApi: TButton;
-    btnColetarAgora: TButton;
     btnSyncTotal: TButton;
-    btnIniciar: TButton;
     btnParar: TButton;
     btnAbrirLogs: TButton;
-    btnTestarTudo: TButton;
     gbMonitor: TGroupBox;
     lblEmpresa: TLabel;
     lblPendentes: TLabel;
@@ -66,12 +64,9 @@ type
     procedure btnSalvarClick(Sender: TObject);
     procedure btnValidarBancoClick(Sender: TObject);
     procedure btnValidarApiClick(Sender: TObject);
-    procedure btnColetarAgoraClick(Sender: TObject);
     procedure btnSyncTotalClick(Sender: TObject);
-    procedure btnIniciarClick(Sender: TObject);
     procedure btnPararClick(Sender: TObject);
     procedure btnAbrirLogsClick(Sender: TObject);
-    procedure btnTestarTudoClick(Sender: TObject);
     procedure tmrAgenteTimer(Sender: TObject);
     procedure tmrTrayCountdownTimer(Sender: TObject);
     procedure miAbrirClick(Sender: TObject);
@@ -102,6 +97,8 @@ type
     procedure AppendEvent(const AText: string);
     procedure RefreshMonitor;
     procedure RunPoll;
+    procedure StartAutomaticSync;
+    function ParseDatabasePaths: TStringDynArray;
     function ReadLastOperationalLines: string;
   public
   end;
@@ -117,6 +114,8 @@ uses
   System.IOUtils, ConfereArquivo.Logger;
 
 procedure TFrmConfereArquivoAgentMain.FormCreate(Sender: TObject);
+var
+  StartHidden: Boolean;
 begin
   Caption := 'Confere Arquivo - Agente Local';
   LoadAgentConfig(FConfig);
@@ -126,6 +125,12 @@ begin
   RecreateEngine;
   AddTrayIcon;
   AppendEvent('Agente carregado.');
+  if FConfig.Enabled then
+    StartAutomaticSync;
+
+  StartHidden := FindCmdLineSwitch('tray', ['-', '/'], True);
+  if StartHidden then
+    HideToTray('Agente iniciado com o Windows. Sincronizacao automatica NFC-e ativa.');
 end;
 
 procedure TFrmConfereArquivoAgentMain.FormDestroy(Sender: TObject);
@@ -172,12 +177,9 @@ begin
   StyleButton(btnSalvar);
   StyleButton(btnValidarBanco);
   StyleButton(btnValidarApi);
-  StyleButton(btnColetarAgora);
   StyleButton(btnSyncTotal);
-  StyleButton(btnIniciar);
   StyleButton(btnParar);
   StyleButton(btnAbrirLogs);
-  StyleButton(btnTestarTudo);
   StyleReadOnlyEdit(edEmpresa, $00EAF0F7);
   StyleReadOnlyEdit(edPendentes, $00FFF0D9);
   StyleReadOnlyEdit(edUltimaMensagem, $00F2F4F7);
@@ -295,8 +297,12 @@ begin
 end;
 
 procedure TFrmConfereArquivoAgentMain.LoadScreen;
+var
+  DatabasePath: string;
 begin
-  edBanco.Text := FConfig.SourceDatabasePath;
+  mmBancos.Clear;
+  for DatabasePath in FConfig.SourceDatabasePaths do
+    mmBancos.Lines.Add(DatabasePath);
   edUsuario.Text := FConfig.FirebirdUser;
   edSenha.Text := FConfig.FirebirdPassword;
   edApiUrl.Text := FConfig.ApiBaseUrl;
@@ -305,6 +311,7 @@ begin
   edtIntervalo.Text := FConfig.IntervalSeconds.ToString;
   edtJanela.Text := FConfig.WindowDays.ToString;
   chkAtivo.Checked := FConfig.Enabled;
+  chkIniciarWindows.Checked := FConfig.StartWithWindows;
   edEmpresa.Text := '';
   edPendentes.Text := '0';
   edUltimaMensagem.Text := '';
@@ -314,7 +321,11 @@ end;
 
 procedure TFrmConfereArquivoAgentMain.SaveScreenToConfig;
 begin
-  FConfig.SourceDatabasePath := Trim(edBanco.Text);
+  FConfig.SourceDatabasePaths := ParseDatabasePaths;
+  if Length(FConfig.SourceDatabasePaths) > 0 then
+    FConfig.SourceDatabasePath := FConfig.SourceDatabasePaths[0]
+  else
+    FConfig.SourceDatabasePath := '';
   FConfig.FirebirdUser := Trim(edUsuario.Text);
   FConfig.FirebirdPassword := edSenha.Text;
   FConfig.ApiBaseUrl := Trim(edApiUrl.Text);
@@ -327,6 +338,7 @@ begin
   if FConfig.WindowDays <= 0 then
     FConfig.WindowDays := 3;
   FConfig.Enabled := chkAtivo.Checked;
+  FConfig.StartWithWindows := chkIniciarWindows.Checked;
   SaveAgentConfig(FConfig);
 end;
 
@@ -403,10 +415,54 @@ begin
   FBusy := False;
 end;
 
+procedure TFrmConfereArquivoAgentMain.StartAutomaticSync;
+begin
+  tmrAgente.Interval := FConfig.IntervalSeconds * 1000;
+  tmrAgente.Enabled := True;
+  FConfig.Enabled := True;
+  chkAtivo.Checked := True;
+  SaveAgentConfig(FConfig);
+  ScheduleNextSync;
+end;
+
+function TFrmConfereArquivoAgentMain.ParseDatabasePaths: TStringDynArray;
+var
+  I: Integer;
+  Value: string;
+  L: TStringList;
+begin
+  L := TStringList.Create;
+  try
+    L.CaseSensitive := False;
+    L.Duplicates := dupIgnore;
+    for I := 0 to mmBancos.Lines.Count - 1 do
+    begin
+      Value := Trim(mmBancos.Lines[I]);
+      if Value = '' then
+        Continue;
+      Value := ExpandFileName(Value);
+      if L.IndexOf(Value) < 0 then
+        L.Add(Value);
+    end;
+    SetLength(Result, L.Count);
+    for I := 0 to L.Count - 1 do
+      Result[I] := L[I];
+  finally
+    L.Free;
+  end;
+end;
+
 procedure TFrmConfereArquivoAgentMain.btnSalvarClick(Sender: TObject);
 begin
   SaveScreenToConfig;
   RecreateEngine;
+  if FConfig.Enabled then
+    StartAutomaticSync
+  else
+  begin
+    tmrAgente.Enabled := False;
+    ScheduleNextSync;
+  end;
   AppendEvent('Configuracao salva.');
 end;
 
@@ -434,25 +490,13 @@ begin
     AppendEvent('Falha API: ' + Msg);
 end;
 
-procedure TFrmConfereArquivoAgentMain.btnColetarAgoraClick(Sender: TObject);
-begin
-  SaveScreenToConfig;
-  RecreateEngine;
-  RunPoll;
-end;
-
 procedure TFrmConfereArquivoAgentMain.btnSyncTotalClick(Sender: TObject);
 begin
   SaveScreenToConfig;
   RecreateEngine;
   try
     FEngine.SyncTotal;
-    chkAtivo.Checked := True;
-    FConfig.Enabled := True;
-    SaveAgentConfig(FConfig);
-    tmrAgente.Interval := FConfig.IntervalSeconds * 1000;
-    tmrAgente.Enabled := True;
-    ScheduleNextSync;
+    StartAutomaticSync;
     AppendEvent(FEngine.LastMessage);
     RefreshMonitor;
   except
@@ -461,19 +505,12 @@ begin
   end;
 end;
 
-procedure TFrmConfereArquivoAgentMain.btnIniciarClick(Sender: TObject);
-begin
-  SaveScreenToConfig;
-  RecreateEngine;
-  tmrAgente.Interval := FConfig.IntervalSeconds * 1000;
-  tmrAgente.Enabled := True;
-  ScheduleNextSync;
-  AppendEvent('Agente automatico iniciado.');
-end;
-
 procedure TFrmConfereArquivoAgentMain.btnPararClick(Sender: TObject);
 begin
   tmrAgente.Enabled := False;
+  FConfig.Enabled := False;
+  chkAtivo.Checked := False;
+  SaveAgentConfig(FConfig);
   ScheduleNextSync;
   AppendEvent('Agente automatico parado.');
 end;
@@ -481,13 +518,6 @@ end;
 procedure TFrmConfereArquivoAgentMain.btnAbrirLogsClick(Sender: TObject);
 begin
   ShellExecute(Handle, 'open', PChar(FConfig.LogPath), nil, nil, SW_SHOWNORMAL);
-end;
-
-procedure TFrmConfereArquivoAgentMain.btnTestarTudoClick(Sender: TObject);
-begin
-  btnValidarBancoClick(Sender);
-  btnValidarApiClick(Sender);
-  btnColetarAgoraClick(Sender);
 end;
 
 procedure TFrmConfereArquivoAgentMain.tmrAgenteTimer(Sender: TObject);
