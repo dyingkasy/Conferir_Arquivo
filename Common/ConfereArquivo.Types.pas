@@ -5,6 +5,9 @@ interface
 uses
   System.SysUtils;
 
+const
+  CONFERE_SYNC_REVISION = 2;
+
 type
   TConfereNFCeStatus = (
     nsIgnorada,

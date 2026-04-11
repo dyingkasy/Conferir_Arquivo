@@ -101,10 +101,17 @@ begin
       'create table if not exists nfce_snapshot (' +
       '  source_id integer primary key,' +
       '  hash_incremento integer not null,' +
+      '  payload_rev integer default 0,' +
       '  status_operacional text,' +
       '  updated_at text' +
       ');';
     Q.ExecSQL;
+
+    if not ColumnExists('nfce_snapshot', 'payload_rev') then
+    begin
+      Q.SQL.Text := 'alter table nfce_snapshot add column payload_rev integer default 0';
+      Q.ExecSQL;
+    end;
 
     Q.SQL.Text :=
       'create table if not exists outbound_queue (' +
@@ -196,11 +203,12 @@ begin
   Q := TFDQuery.Create(nil);
   try
     Q.Connection := FConnection;
-    Q.SQL.Text := 'select hash_incremento from nfce_snapshot where source_id = :id';
+    Q.SQL.Text := 'select hash_incremento, coalesce(payload_rev, 0) payload_rev from nfce_snapshot where source_id = :id';
     Q.ParamByName('id').AsInteger := AItem.SourceID;
     Q.Open;
     if not Q.IsEmpty then
-      Result := Q.FieldByName('hash_incremento').AsInteger <> AItem.HashIncremento;
+      Result := (Q.FieldByName('hash_incremento').AsInteger <> AItem.HashIncremento) or
+                (Q.FieldByName('payload_rev').AsInteger <> CONFERE_SYNC_REVISION);
   finally
     Q.Free;
   end;
@@ -226,10 +234,11 @@ begin
     Q.ExecSQL;
 
     Q.SQL.Text :=
-      'insert or replace into nfce_snapshot(source_id, hash_incremento, status_operacional, updated_at) ' +
-      'values (:source_id, :hash_incremento, :status_operacional, :updated_at)';
+      'insert or replace into nfce_snapshot(source_id, hash_incremento, payload_rev, status_operacional, updated_at) ' +
+      'values (:source_id, :hash_incremento, :payload_rev, :status_operacional, :updated_at)';
     Q.ParamByName('source_id').AsInteger := AItem.SourceID;
     Q.ParamByName('hash_incremento').AsInteger := AItem.HashIncremento;
+    Q.ParamByName('payload_rev').AsInteger := CONFERE_SYNC_REVISION;
     Q.ParamByName('status_operacional').AsString := ConfereStatusToString(AItem.StatusOperacional);
     Q.ParamByName('updated_at').AsString := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
     Q.ExecSQL;
