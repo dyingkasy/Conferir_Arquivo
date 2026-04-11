@@ -361,6 +361,17 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
   object TrayPopup: TPopupMenu
     Left = 952
     Top = 16
+    object miStatus: TMenuItem
+      Caption = 'Agente automatico: PARADO'
+      Enabled = False
+    end
+    object miProximaSync: TMenuItem
+      Caption = 'Proxima sincronizacao: manual'
+      Enabled = False
+    end
+    object N1: TMenuItem
+      Caption = '-'
+    end
     object miAbrir: TMenuItem
       Caption = 'Abrir'
       OnClick = miAbrirClick
@@ -376,5 +387,12 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     OnTimer = tmrAgenteTimer
     Left = 1000
     Top = 16
+  end
+  object tmrTrayCountdown: TTimer
+    Enabled = False
+    Interval = 1000
+    OnTimer = tmrTrayCountdownTimer
+    Left = 1000
+    Top = 56
   end
 end

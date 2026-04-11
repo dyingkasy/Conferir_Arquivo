@@ -8,6 +8,8 @@ uses
   ConfereArquivo.Office.Client in 'ConfereArquivo.Office.Client.pas',
   ConfereArquivo.Logger in '..\..\Common\ConfereArquivo.Logger.pas';
 
+{$R 'OfficeIcon.res'}
+
 begin
   ReportMemoryLeaksOnShutdown := DebugHook <> 0;
   Application.Initialize;

@@ -3,7 +3,7 @@ unit Frm_ConfereArquivoAgentMain;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, Winapi.ShellAPI, System.SysUtils, System.Classes, System.Math,
+  Winapi.Windows, Winapi.Messages, Winapi.ShellAPI, System.SysUtils, System.Classes, System.Math, System.DateUtils,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.Menus,
   ConfereArquivo.Agent.Config, ConfereArquivo.Agent.Sync;
 
@@ -52,7 +52,11 @@ type
     edUltimaLeitura: TEdit;
     mmEventos: TMemo;
     tmrAgente: TTimer;
+    tmrTrayCountdown: TTimer;
     TrayPopup: TPopupMenu;
+    miStatus: TMenuItem;
+    miProximaSync: TMenuItem;
+    N1: TMenuItem;
     miAbrir: TMenuItem;
     miSair: TMenuItem;
     procedure FormCreate(Sender: TObject);
@@ -69,6 +73,7 @@ type
     procedure btnAbrirLogsClick(Sender: TObject);
     procedure btnTestarTudoClick(Sender: TObject);
     procedure tmrAgenteTimer(Sender: TObject);
+    procedure tmrTrayCountdownTimer(Sender: TObject);
     procedure miAbrirClick(Sender: TObject);
     procedure miSairClick(Sender: TObject);
   private
@@ -78,6 +83,7 @@ type
     FEngine: TConfereSyncEngine;
     FBusy: Boolean;
     FForceExit: Boolean;
+    FNextSyncAt: TDateTime;
     FTrayData: TNotifyIconData;
     procedure ApplyVisualStyle;
     procedure StyleReadOnlyEdit(AEdit: TEdit; const AColor: TColor);
@@ -87,6 +93,8 @@ type
     procedure ShowTrayBalloon(const ATitle, AText: string);
     procedure HideToTray(const AMessage: string);
     procedure ShowFromTray;
+    procedure UpdateTrayMenu;
+    procedure ScheduleNextSync;
     procedure WMTrayIcon(var Msg: TMessage); message WM_TRAYICON;
     procedure LoadScreen;
     procedure SaveScreenToConfig;
@@ -177,6 +185,11 @@ begin
   mmEventos.Color := clWhite;
   mmEventos.Font.Name := 'Consolas';
   mmEventos.Font.Height := -11;
+  miStatus.Enabled := False;
+  miProximaSync.Enabled := False;
+  tmrTrayCountdown.Interval := 1000;
+  tmrTrayCountdown.Enabled := True;
+  UpdateTrayMenu;
 end;
 
 procedure TFrmConfereArquivoAgentMain.AddTrayIcon;
@@ -225,6 +238,44 @@ begin
   WindowState := wsNormal;
   Application.Restore;
   SetForegroundWindow(Handle);
+end;
+
+procedure TFrmConfereArquivoAgentMain.ScheduleNextSync;
+begin
+  if tmrAgente.Enabled then
+    FNextSyncAt := Now + EncodeTime(0, 0, FConfig.IntervalSeconds, 0)
+  else
+    FNextSyncAt := 0;
+  UpdateTrayMenu;
+end;
+
+procedure TFrmConfereArquivoAgentMain.UpdateTrayMenu;
+var
+  Remaining: Integer;
+  TrayTip: string;
+begin
+  if tmrAgente.Enabled then
+  begin
+    miStatus.Caption := 'Agente automatico: ATIVO';
+    Remaining := SecondsBetween(FNextSyncAt, Now);
+    if Remaining < 0 then
+      Remaining := 0;
+    miProximaSync.Caption := Format('Proxima sincronizacao em %d s', [Remaining]);
+    TrayTip := Format('Confere Arquivo | proxima sync em %d s', [Remaining]);
+  end
+  else
+  begin
+    miStatus.Caption := 'Agente automatico: PARADO';
+    miProximaSync.Caption := 'Proxima sincronizacao: manual';
+    TrayTip := 'Confere Arquivo | sincronizacao manual';
+  end;
+
+  if FTrayData.Wnd <> 0 then
+  begin
+    StrPLCopy(FTrayData.szTip, TrayTip, Length(FTrayData.szTip) - 1);
+    FTrayData.uFlags := NIF_MESSAGE or NIF_ICON or NIF_TIP;
+    Shell_NotifyIcon(NIM_MODIFY, @FTrayData);
+  end;
 end;
 
 procedure TFrmConfereArquivoAgentMain.WMTrayIcon(var Msg: TMessage);
@@ -341,6 +392,7 @@ begin
     FEngine.PollNow;
     AppendEvent(FEngine.LastMessage);
     RefreshMonitor;
+    ScheduleNextSync;
   except
     on E: Exception do
     begin
@@ -395,6 +447,12 @@ begin
   RecreateEngine;
   try
     FEngine.SyncTotal;
+    chkAtivo.Checked := True;
+    FConfig.Enabled := True;
+    SaveAgentConfig(FConfig);
+    tmrAgente.Interval := FConfig.IntervalSeconds * 1000;
+    tmrAgente.Enabled := True;
+    ScheduleNextSync;
     AppendEvent(FEngine.LastMessage);
     RefreshMonitor;
   except
@@ -409,12 +467,14 @@ begin
   RecreateEngine;
   tmrAgente.Interval := FConfig.IntervalSeconds * 1000;
   tmrAgente.Enabled := True;
+  ScheduleNextSync;
   AppendEvent('Agente automatico iniciado.');
 end;
 
 procedure TFrmConfereArquivoAgentMain.btnPararClick(Sender: TObject);
 begin
   tmrAgente.Enabled := False;
+  ScheduleNextSync;
   AppendEvent('Agente automatico parado.');
 end;
 
@@ -435,6 +495,11 @@ begin
   RunPoll;
 end;
 
+procedure TFrmConfereArquivoAgentMain.tmrTrayCountdownTimer(Sender: TObject);
+begin
+  UpdateTrayMenu;
+end;
+
 procedure TFrmConfereArquivoAgentMain.miAbrirClick(Sender: TObject);
 begin
   ShowFromTray;
@@ -444,6 +509,7 @@ procedure TFrmConfereArquivoAgentMain.miSairClick(Sender: TObject);
 begin
   FForceExit := True;
   tmrAgente.Enabled := False;
+  ScheduleNextSync;
   Close;
 end;
 
