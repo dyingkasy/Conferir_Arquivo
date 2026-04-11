@@ -31,6 +31,8 @@ func NewRouter(logger *slog.Logger, pgStore *store.Postgres) http.Handler {
 	r.Post("/api/v1/nfce/lote", handler.Lote)
 	r.Get("/api/v1/nfce/resumo", handler.Resumo)
 	r.Get("/api/v1/nfce/lista", handler.Lista)
+	r.Get("/api/v1/nfce/series", handler.Series)
+	r.Get("/api/v1/nfce/computadores", handler.Computadores)
 
 	return r
 }

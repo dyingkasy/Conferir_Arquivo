@@ -32,7 +32,11 @@ type
     lblStatus: TLabel;
     lblDataInicial: TLabel;
     lblDataFinal: TLabel;
+    lblSerie: TLabel;
+    lblComputador: TLabel;
     cbStatus: TComboBox;
+    cbSerie: TComboBox;
+    cbComputador: TComboBox;
     dtDataInicial: TDateTimePicker;
     dtDataFinal: TDateTimePicker;
     btnConsultar: TButton;
@@ -96,6 +100,7 @@ type
     procedure LoadEmpresas;
     procedure ApplyCompanyFilter;
     function GetSelectedEmpresaIndex: Integer;
+    procedure LoadFiltroOpcoes;
     procedure LoadResumo;
     procedure LoadLista;
   public
@@ -201,6 +206,10 @@ begin
   edToken.Text := FConfig.ApiToken;
   cbStatus.Items.Text := 'TODOS'#13#10'TRANSMITIDA'#13#10'CONTINGENCIA'#13#10'ERRO'#13#10'SEM_FISCAL';
   cbStatus.ItemIndex := 0;
+  cbSerie.Items.Text := 'TODAS';
+  cbSerie.ItemIndex := 0;
+  cbComputador.Items.Text := 'TODOS';
+  cbComputador.ItemIndex := 0;
   dtDataInicial.Date := StartOfTheMonth(Date);
   dtDataFinal.Date := Date;
   edEmpresaFiltro.Text := '';
@@ -234,8 +243,8 @@ begin
   sgNotas.Cells[8,0] := 'ICMS';
   sgNotas.Cells[9,0] := 'PIS';
   sgNotas.Cells[10,0] := 'COFINS';
-  sgNotas.Cells[11,0] := 'Cliente';
-  sgNotas.Cells[12,0] := 'Documento';
+  sgNotas.Cells[11,0] := 'Computador';
+  sgNotas.Cells[12,0] := 'Cliente';
   sgNotas.Cells[13,0] := 'Protocolo';
   sgNotas.ColWidths[0] := 72;
   sgNotas.ColWidths[1] := 58;
@@ -248,8 +257,8 @@ begin
   sgNotas.ColWidths[8] := 66;
   sgNotas.ColWidths[9] := 60;
   sgNotas.ColWidths[10] := 68;
-  sgNotas.ColWidths[11] := 210;
-  sgNotas.ColWidths[12] := 108;
+  sgNotas.ColWidths[11] := 130;
+  sgNotas.ColWidths[12] := 180;
   sgNotas.ColWidths[13] := 148;
 end;
 
@@ -301,6 +310,46 @@ begin
   end;
 end;
 
+procedure TFrmConfereArquivoOfficeMain.LoadFiltroOpcoes;
+var
+  Client: TConfereOfficeClient;
+  Series: TArray<TConfereFiltroValor>;
+  Computadores: TArray<TConfereFiltroValor>;
+  Item: TConfereFiltroValor;
+begin
+  cbSerie.Items.BeginUpdate;
+  cbComputador.Items.BeginUpdate;
+  try
+    cbSerie.Items.Clear;
+    cbComputador.Items.Clear;
+    cbSerie.Items.Add('TODAS');
+    cbComputador.Items.Add('TODOS');
+
+    if Trim(FConfig.CNPJEmpresa) = '' then
+      Exit;
+
+    Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
+    try
+      Series := Client.LoadSeries(FConfig.CNPJEmpresa);
+      Computadores := Client.LoadComputadores(FConfig.CNPJEmpresa);
+    finally
+      Client.Free;
+    end;
+
+    for Item in Series do
+      cbSerie.Items.Add(Item.Valor);
+    for Item in Computadores do
+      cbComputador.Items.Add(Item.Valor);
+  finally
+    if cbSerie.Items.Count > 0 then
+      cbSerie.ItemIndex := 0;
+    if cbComputador.Items.Count > 0 then
+      cbComputador.ItemIndex := 0;
+    cbSerie.Items.EndUpdate;
+    cbComputador.Items.EndUpdate;
+  end;
+end;
+
 procedure TFrmConfereArquivoOfficeMain.ApplyCompanyFilter;
 var
   I, VisibleCount, SelectListIdx: Integer;
@@ -336,6 +385,7 @@ begin
   finally
     lbEmpresas.Items.EndUpdate;
   end;
+  LoadFiltroOpcoes;
 end;
 
 function TFrmConfereArquivoOfficeMain.GetSelectedEmpresaIndex: Integer;
@@ -349,13 +399,26 @@ procedure TFrmConfereArquivoOfficeMain.LoadResumo;
 var
   Client: TConfereOfficeClient;
   Resumo: TConfereResumo;
+  SerieFiltro: string;
+  ComputadorFiltro: string;
 begin
+  if cbSerie.ItemIndex > 0 then
+    SerieFiltro := cbSerie.Text
+  else
+    SerieFiltro := '';
+  if cbComputador.ItemIndex > 0 then
+    ComputadorFiltro := cbComputador.Text
+  else
+    ComputadorFiltro := '';
+
   Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
   try
     Resumo := Client.LoadResumo(
       FConfig.CNPJEmpresa,
       FormatDateTime('yyyy-mm-dd', dtDataInicial.Date),
       FormatDateTime('yyyy-mm-dd', dtDataFinal.Date),
+      SerieFiltro,
+      ComputadorFiltro,
       FConfig.DiasResumo);
     edTotal.Text := IntToStr(Resumo.QuantidadeTotal);
     edTransmitidas.Text := IntToStr(Resumo.QuantidadeTransmitida);
@@ -384,17 +447,29 @@ var
   Items: TArray<TConfereNotaConsulta>;
   I: Integer;
   StatusValue: string;
+  SerieFiltro: string;
+  ComputadorFiltro: string;
 begin
   Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
   try
     StatusValue := '';
     if cbStatus.ItemIndex > 0 then
       StatusValue := cbStatus.Text;
+    if cbSerie.ItemIndex > 0 then
+      SerieFiltro := cbSerie.Text
+    else
+      SerieFiltro := '';
+    if cbComputador.ItemIndex > 0 then
+      ComputadorFiltro := cbComputador.Text
+    else
+      ComputadorFiltro := '';
     Items := Client.LoadLista(
       FConfig.CNPJEmpresa,
       StatusValue,
       FormatDateTime('yyyy-mm-dd', dtDataInicial.Date),
       FormatDateTime('yyyy-mm-dd', dtDataFinal.Date),
+      SerieFiltro,
+      ComputadorFiltro,
       250);
     sgNotas.RowCount := Max(Length(Items) + 1, 2);
     for I := 0 to Length(Items) - 1 do
@@ -410,8 +485,8 @@ begin
       sgNotas.Cells[8, I + 1] := FormatFloat('0.00', Items[I].ICMS);
       sgNotas.Cells[9, I + 1] := FormatFloat('0.00', Items[I].PIS);
       sgNotas.Cells[10, I + 1] := FormatFloat('0.00', Items[I].COFINS);
-      sgNotas.Cells[11, I + 1] := Items[I].NomeCliente;
-      sgNotas.Cells[12, I + 1] := Items[I].DocumentoCliente;
+      sgNotas.Cells[11, I + 1] := Items[I].NomeComputador;
+      sgNotas.Cells[12, I + 1] := Items[I].NomeCliente;
       sgNotas.Cells[13, I + 1] := Items[I].Protocolo;
     end;
   finally
@@ -469,6 +544,7 @@ begin
   begin
     FConfig.CNPJEmpresa := FEmpresas[EmpresaIdx].CNPJ;
     SaveOfficeConfig(FConfig);
+    LoadFiltroOpcoes;
   end;
 end;
 

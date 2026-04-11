@@ -59,7 +59,7 @@ func (h *Handler) ConfigCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.SaveHeartbeat(r.Context(), cnpj, req.InstalacaoID, remoteIP(r)); err != nil {
+	if err := h.store.SaveHeartbeat(r.Context(), cnpj, req.InstalacaoID, req.NomeComputador, remoteIP(r)); err != nil {
 		h.logger.Error("failed to save heartbeat during config-check", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to persist heartbeat"})
 		return
@@ -91,7 +91,7 @@ func (h *Handler) Heartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.SaveHeartbeat(r.Context(), cnpj, req.InstalacaoID, remoteIP(r)); err != nil {
+	if err := h.store.SaveHeartbeat(r.Context(), cnpj, req.InstalacaoID, req.NomeComputador, remoteIP(r)); err != nil {
 		h.logger.Error("failed to save heartbeat", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to persist heartbeat"})
 		return
@@ -158,6 +158,8 @@ func (h *Handler) Resumo(w http.ResponseWriter, r *http.Request) {
 	cnpj := model.NormalizeDigits(r.URL.Query().Get("cnpj_empresa"))
 	dataInicial := strings.TrimSpace(r.URL.Query().Get("data_inicial"))
 	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
+	serie := strings.TrimSpace(r.URL.Query().Get("serie_nfce"))
+	nomeComputador := strings.TrimSpace(r.URL.Query().Get("nome_computador"))
 	dias := 7
 	if value := strings.TrimSpace(r.URL.Query().Get("dias")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
@@ -168,7 +170,7 @@ func (h *Handler) Resumo(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
 		return
 	}
-	resp, err := h.store.GetResumo(r.Context(), cnpj, token, dataInicial, dataFinal, dias)
+	resp, err := h.store.GetResumo(r.Context(), cnpj, token, dataInicial, dataFinal, serie, nomeComputador, dias)
 	if err != nil {
 		h.writeAuthError(w, err)
 		return
@@ -182,6 +184,8 @@ func (h *Handler) Lista(w http.ResponseWriter, r *http.Request) {
 	status := strings.TrimSpace(r.URL.Query().Get("status_operacional"))
 	dataInicial := strings.TrimSpace(r.URL.Query().Get("data_inicial"))
 	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
+	serie := strings.TrimSpace(r.URL.Query().Get("serie_nfce"))
+	nomeComputador := strings.TrimSpace(r.URL.Query().Get("nome_computador"))
 	limit := 200
 	if value := strings.TrimSpace(r.URL.Query().Get("limit")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
@@ -192,7 +196,45 @@ func (h *Handler) Lista(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
 		return
 	}
-	items, err := h.store.ListNFCe(r.Context(), cnpj, token, status, dataInicial, dataFinal, limit)
+	items, err := h.store.ListNFCe(r.Context(), cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, limit)
+	if err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "ok",
+		"quantidade": len(items),
+		"items":      items,
+	})
+}
+
+func (h *Handler) Series(w http.ResponseWriter, r *http.Request) {
+	token := auth.BearerToken(r.Header.Get("Authorization"))
+	cnpj := model.NormalizeDigits(r.URL.Query().Get("cnpj_empresa"))
+	if cnpj == "" || token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
+		return
+	}
+	items, err := h.store.ListSeries(r.Context(), cnpj, token)
+	if err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "ok",
+		"quantidade": len(items),
+		"items":      items,
+	})
+}
+
+func (h *Handler) Computadores(w http.ResponseWriter, r *http.Request) {
+	token := auth.BearerToken(r.Header.Get("Authorization"))
+	cnpj := model.NormalizeDigits(r.URL.Query().Get("cnpj_empresa"))
+	if cnpj == "" || token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
+		return
+	}
+	items, err := h.store.ListComputadores(r.Context(), cnpj, token)
 	if err != nil {
 		h.writeAuthError(w, err)
 		return

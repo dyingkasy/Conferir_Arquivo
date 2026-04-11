@@ -207,6 +207,7 @@ begin
         Body.AddPair('cnpj_empresa', NormalizeDigits(Context.Empresa.CNPJ));
         Body.AddPair('instalacao_id', FConfig.InstalacaoID);
         Body.AddPair('razao_social', Context.Empresa.RazaoSocial);
+        Body.AddPair('nome_computador', Context.Empresa.NomeComputador);
         Req := TStringStream.Create(Body.ToJSON, TEncoding.UTF8);
         try
           Resp := Client.Post(Url, Req);

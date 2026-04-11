@@ -42,7 +42,8 @@ begin
     .AddPair('tipo_regime', AEmpresa.TipoRegime)
     .AddPair('cidade', AEmpresa.Cidade)
     .AddPair('uf', AEmpresa.UF)
-    .AddPair('codigo_ibge_cidade', TJSONNumber.Create(AEmpresa.CodigoIBGECidade)));
+    .AddPair('codigo_ibge_cidade', TJSONNumber.Create(AEmpresa.CodigoIBGECidade))
+    .AddPair('nome_computador', AEmpresa.NomeComputador));
 
   Result.AddPair('venda', TJSONObject.Create
     .AddPair('source_id', TJSONNumber.Create(ARecord.SourceID))
@@ -76,6 +77,7 @@ begin
     .AddPair('imposto_estadual', JsonNumberOrZero(ARecord.ImpostoEstadual))
     .AddPair('documento_cliente', NormalizeDigits(ARecord.DocumentoCliente))
     .AddPair('nome_cliente', ARecord.NomeCliente)
+    .AddPair('nome_computador', AEmpresa.NomeComputador)
     .AddPair('hash_incremento', TJSONNumber.Create(ARecord.HashIncremento))
     .AddPair('status_operacional', ConfereStatusToString(ARecord.StatusOperacional)));
 end;
@@ -100,6 +102,7 @@ begin
   Result := TJSONObject.Create;
   Result.AddPair('cnpj_empresa', NormalizeDigits(ACNPJ));
   Result.AddPair('instalacao_id', AInstalacaoID);
+  Result.AddPair('nome_computador', GetEnvironmentVariable('COMPUTERNAME'));
   Result.AddPair('gerado_em', DateToISO8601(Now, False));
   Result.AddPair('quantidade', TJSONNumber.Create(Length(AItems)));
   Result.AddPair('notas', Arr);

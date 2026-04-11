@@ -6,7 +6,7 @@ uses
   System.SysUtils;
 
 const
-  CONFERE_SYNC_REVISION = 2;
+  CONFERE_SYNC_REVISION = 3;
 
 type
   TConfereNFCeStatus = (
@@ -34,6 +34,7 @@ type
     CodigoIBGECidade: Integer;
     NFCeOff: string;
     DesativarTransmissao: string;
+    NomeComputador: string;
   end;
 
   TConfereNFCeRecord = record

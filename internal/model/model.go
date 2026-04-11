@@ -15,11 +15,13 @@ type ConfigCheckRequest struct {
 type HeartbeatRequest struct {
 	CNPJEmpresa  string `json:"cnpj_empresa"`
 	InstalacaoID string `json:"instalacao_id"`
+	NomeComputador string `json:"nome_computador"`
 }
 
 type LoteRequest struct {
 	CNPJEmpresa  string            `json:"cnpj_empresa"`
 	InstalacaoID string            `json:"instalacao_id"`
+	NomeComputador string          `json:"nome_computador"`
 	GeradoEm     string            `json:"gerado_em"`
 	Quantidade   int               `json:"quantidade"`
 	Notas        []json.RawMessage `json:"notas"`
@@ -53,6 +55,7 @@ type ResumoResponse struct {
 type NFCeListItem struct {
 	SourceID          int32    `json:"source_id"`
 	InstalacaoID      string   `json:"instalacao_id"`
+	NomeComputador    string   `json:"nome_computador"`
 	GrupoConferencia  string   `json:"grupo_conferencia"`
 	DataVenda         *string  `json:"data_venda,omitempty"`
 	HoraVenda         string   `json:"hora_venda"`
@@ -83,6 +86,10 @@ type EmpresaListItem struct {
 	UltimaAtualizacao string `json:"ultima_atualizacao,omitempty"`
 }
 
+type FiltroValorItem struct {
+	Valor string `json:"valor"`
+}
+
 type NotaPayload struct {
 	Empresa           map[string]any `json:"empresa"`
 	Venda             map[string]any `json:"venda"`
@@ -93,6 +100,7 @@ type NFCeEspelhoRow struct {
 	CNPJEmpresa        string
 	SourceID           int32
 	InstalacaoID       string
+	NomeComputador     string
 	IDECFMovimento     *int32
 	DataVenda          *time.Time
 	HoraVenda          string

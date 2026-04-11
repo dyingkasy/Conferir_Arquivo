@@ -211,6 +211,20 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Height = 15
         Caption = 'Data final'
       end
+      object lblSerie: TLabel
+        Left = 466
+        Top = 23
+        Width = 27
+        Height = 15
+        Caption = 'Serie'
+      end
+      object lblComputador: TLabel
+        Left = 612
+        Top = 23
+        Width = 68
+        Height = 15
+        Caption = 'Computador'
+      end
       object cbStatus: TComboBox
         Left = 12
         Top = 40
@@ -239,13 +253,29 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Kind = dtkDate
         TabOrder = 2
       end
-      object btnConsultar: TButton
+      object cbSerie: TComboBox
         Left = 466
+        Top = 40
+        Width = 128
+        Height = 23
+        Style = csDropDownList
+        TabOrder = 3
+      end
+      object cbComputador: TComboBox
+        Left = 612
+        Top = 40
+        Width = 180
+        Height = 23
+        Style = csDropDownList
+        TabOrder = 4
+      end
+      object btnConsultar: TButton
+        Left = 808
         Top = 37
-        Width = 126
+        Width = 116
         Height = 28
         Caption = 'Consultar Agora'
-        TabOrder = 3
+        TabOrder = 5
         OnClick = btnConsultarClick
       end
     end

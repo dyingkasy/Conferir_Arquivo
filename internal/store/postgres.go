@@ -124,7 +124,7 @@ func (p *Postgres) EnsureTenantToken(ctx context.Context, cnpj, token, razaoSoci
 	return p.ValidateTenantToken(ctx, cnpj, token)
 }
 
-func (p *Postgres) SaveHeartbeat(ctx context.Context, cnpj, instalacaoID, remoteIP string) error {
+func (p *Postgres) SaveHeartbeat(ctx context.Context, cnpj, instalacaoID, nomeComputador, remoteIP string) error {
 	cnpj = model.NormalizeDigits(cnpj)
 	instalacaoID = strings.TrimSpace(instalacaoID)
 	if instalacaoID == "" {
@@ -135,15 +135,17 @@ func (p *Postgres) SaveHeartbeat(ctx context.Context, cnpj, instalacaoID, remote
 		insert into agente_instalacao (
 			instalacao_id,
 			cnpj_empresa,
+			nome_computador,
 			remote_ip,
 			last_seen_at,
 			created_at
-		) values ($1, $2, $3, now(), now())
+		) values ($1, $2, $3, $4, now(), now())
 		on conflict (instalacao_id) do update
 		set cnpj_empresa = excluded.cnpj_empresa,
+			nome_computador = excluded.nome_computador,
 			remote_ip = excluded.remote_ip,
 			last_seen_at = now()
-	`, instalacaoID, cnpj, trimRemoteIP(remoteIP))
+	`, instalacaoID, cnpj, strings.TrimSpace(nomeComputador), trimRemoteIP(remoteIP))
 	return err
 }
 
@@ -172,7 +174,7 @@ func (p *Postgres) SaveLote(ctx context.Context, lote model.LoteRequest, token, 
 	}
 	defer tx.Rollback(ctx)
 
-	if err := p.saveHeartbeatTx(ctx, tx, cnpj, instalacaoID, remoteIP); err != nil {
+	if err := p.saveHeartbeatTx(ctx, tx, cnpj, instalacaoID, lote.NomeComputador, remoteIP); err != nil {
 		return err
 	}
 
@@ -204,7 +206,7 @@ func (p *Postgres) SaveLote(ctx context.Context, lote model.LoteRequest, token, 
 	return tx.Commit(ctx)
 }
 
-func (p *Postgres) GetResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal string, dias int) (model.ResumoResponse, error) {
+func (p *Postgres) GetResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador string, dias int) (model.ResumoResponse, error) {
 	if dias <= 0 {
 		dias = 7
 	}
@@ -247,6 +249,16 @@ func (p *Postgres) GetResumo(ctx context.Context, cnpj, token, dataInicial, data
 	if strings.TrimSpace(dataFinal) != "" {
 		baseSQL += fmt.Sprintf(" and coalesce(data_venda, current_date) <= $%d", argPos)
 		args = append(args, dataFinal)
+		argPos++
+	}
+	if strings.TrimSpace(serie) != "" {
+		baseSQL += fmt.Sprintf(" and coalesce(serie_nfce, 0) = $%d", argPos)
+		args = append(args, strings.TrimSpace(serie))
+		argPos++
+	}
+	if strings.TrimSpace(nomeComputador) != "" {
+		baseSQL += fmt.Sprintf(" and upper(coalesce(nome_computador, '')) = upper($%d)", argPos)
+		args = append(args, strings.TrimSpace(nomeComputador))
 		argPos++
 	}
 	if strings.TrimSpace(dataInicial) == "" && strings.TrimSpace(dataFinal) == "" {
@@ -313,7 +325,7 @@ func (p *Postgres) ListEmpresas(ctx context.Context, token string) ([]model.Empr
 	return items, rows.Err()
 }
 
-func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicial, dataFinal string, limit int) ([]model.NFCeListItem, error) {
+func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador string, limit int) ([]model.NFCeListItem, error) {
 	cnpj = model.NormalizeDigits(cnpj)
 	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
 		return nil, err
@@ -323,7 +335,7 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 	}
 
 	baseSQL := `
-		select source_id, instalacao_id,
+		select source_id, instalacao_id, coalesce(nome_computador, ''),
 		       case
 		         when upper(coalesce(status_operacional, '')) in ('AUTORIZADA', 'CONTINGENCIA_AUTORIZADA') then 'TRANSMITIDA'
 		         when upper(coalesce(status_operacional, '')) in ('REJEITADA', 'CANCELADA') then 'ERRO'
@@ -331,7 +343,7 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 		         else 'SEM_FISCAL'
 		       end as grupo_conferencia,
 		       data_venda, hora_venda, data_autorizacao, num_nfce, serie_nfce, chave_acesso, protocolo,
-		       status_operacional, status_erro, nfce_offline, nfce_cancelada, total_documento, base_icms, icms, pis, cofins, imposto, imposto_estadual, nome_cliente, documento_cliente
+		       status_operacional, status_erro, nfce_offline, nfce_cancelada, valor_final, base_icms, icms, pis, cofins, imposto, imposto_estadual, nome_cliente, documento_cliente
 		from nfce_cabecalho_espelho
 		where cnpj_empresa = $1
 	`
@@ -365,6 +377,16 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 		args = append(args, dataFinal)
 		argPos++
 	}
+	if strings.TrimSpace(serie) != "" {
+		baseSQL += fmt.Sprintf(" and coalesce(serie_nfce, 0) = $%d", argPos)
+		args = append(args, strings.TrimSpace(serie))
+		argPos++
+	}
+	if strings.TrimSpace(nomeComputador) != "" {
+		baseSQL += fmt.Sprintf(" and upper(coalesce(nome_computador, '')) = upper($%d)", argPos)
+		args = append(args, strings.TrimSpace(nomeComputador))
+		argPos++
+	}
 
 	baseSQL += fmt.Sprintf(" order by coalesce(data_venda, current_date) desc, source_id desc limit $%d", argPos)
 	args = append(args, limit)
@@ -390,6 +412,7 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 		if err := rows.Scan(
 			&item.SourceID,
 			&item.InstalacaoID,
+			&item.NomeComputador,
 			&item.GrupoConferencia,
 			&dataVenda,
 			&item.HoraVenda,
@@ -434,20 +457,80 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 	return items, rows.Err()
 }
 
-func (p *Postgres) saveHeartbeatTx(ctx context.Context, tx pgx.Tx, cnpj, instalacaoID, remoteIP string) error {
+func (p *Postgres) ListSeries(ctx context.Context, cnpj, token string) ([]model.FiltroValorItem, error) {
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return nil, err
+	}
+
+	rows, err := p.pool.Query(ctx, `
+		select distinct trim(coalesce(serie_nfce::text, ''))
+		from nfce_cabecalho_espelho
+		where cnpj_empresa = $1
+		  and coalesce(serie_nfce, 0) > 0
+		order by 1
+	`, cnpj)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.FiltroValorItem, 0)
+	for rows.Next() {
+		var item model.FiltroValorItem
+		if err := rows.Scan(&item.Valor); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (p *Postgres) ListComputadores(ctx context.Context, cnpj, token string) ([]model.FiltroValorItem, error) {
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return nil, err
+	}
+
+	rows, err := p.pool.Query(ctx, `
+		select distinct trim(coalesce(nome_computador, ''))
+		from nfce_cabecalho_espelho
+		where cnpj_empresa = $1
+		  and trim(coalesce(nome_computador, '')) <> ''
+		order by 1
+	`, cnpj)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.FiltroValorItem, 0)
+	for rows.Next() {
+		var item model.FiltroValorItem
+		if err := rows.Scan(&item.Valor); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (p *Postgres) saveHeartbeatTx(ctx context.Context, tx pgx.Tx, cnpj, instalacaoID, nomeComputador, remoteIP string) error {
 	_, err := tx.Exec(ctx, `
 		insert into agente_instalacao (
 			instalacao_id,
 			cnpj_empresa,
+			nome_computador,
 			remote_ip,
 			last_seen_at,
 			created_at
-		) values ($1, $2, $3, now(), now())
+		) values ($1, $2, $3, $4, now(), now())
 		on conflict (instalacao_id) do update
 		set cnpj_empresa = excluded.cnpj_empresa,
+			nome_computador = excluded.nome_computador,
 			remote_ip = excluded.remote_ip,
 			last_seen_at = now()
-	`, instalacaoID, cnpj, trimRemoteIP(remoteIP))
+	`, instalacaoID, cnpj, strings.TrimSpace(nomeComputador), trimRemoteIP(remoteIP))
 	return err
 }
 
@@ -457,6 +540,7 @@ func (p *Postgres) upsertEspelho(ctx context.Context, tx pgx.Tx, row model.NFCeE
 			cnpj_empresa,
 			source_id,
 			instalacao_id,
+			nome_computador,
 			id_ecf_movimento,
 			data_venda,
 			hora_venda,
@@ -494,10 +578,11 @@ func (p *Postgres) upsertEspelho(ctx context.Context, tx pgx.Tx, row model.NFCeE
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
 			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
 			$21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
-			$31, $32, $33::jsonb, $34, now(), now()
+			$31, $32, $33, $34::jsonb, $35, now(), now()
 		)
 		on conflict (cnpj_empresa, source_id) do update set
 			instalacao_id = excluded.instalacao_id,
+			nome_computador = excluded.nome_computador,
 			id_ecf_movimento = excluded.id_ecf_movimento,
 			data_venda = excluded.data_venda,
 			hora_venda = excluded.hora_venda,
@@ -530,7 +615,7 @@ func (p *Postgres) upsertEspelho(ctx context.Context, tx pgx.Tx, row model.NFCeE
 			payload_json = excluded.payload_json,
 			remote_ip = excluded.remote_ip,
 			updated_at = now()
-	`, row.CNPJEmpresa, row.SourceID, row.InstalacaoID, row.IDECFMovimento, row.DataVenda, row.HoraVenda, row.StatusVenda,
+	`, row.CNPJEmpresa, row.SourceID, row.InstalacaoID, strings.TrimSpace(row.NomeComputador), row.IDECFMovimento, row.DataVenda, row.HoraVenda, row.StatusVenda,
 		row.NumNFCe, row.SerieNFCe, row.ChaveAcesso, row.Protocolo, row.NFCeCancelada, row.NFCeOffline, row.CodigoNumericoNFCe,
 		row.CaminhoXML, row.StatusErro, row.DHCont, row.DataAutorizacao, row.ValorVenda, row.ValorFinal, row.TotalProdutos,
 		row.TotalDocumento, row.BaseICMS, row.ICMS, row.PIS, row.COFINS, row.Imposto, row.ImpostoEstadual, row.DocumentoCliente,
@@ -562,6 +647,7 @@ func buildEspelhoRow(cnpj, instalacaoID string, rawNota []byte, remoteIP string)
 		CNPJEmpresa:      cnpj,
 		SourceID:         sourceID,
 		InstalacaoID:     instalacaoID,
+		NomeComputador:   firstNonEmpty(getString(venda, "nome_computador"), getStringMap(noteRoot, "nome_computador")),
 		HoraVenda:        getString(venda, "hora_venda"),
 		StatusVenda:      getString(venda, "status_venda"),
 		ChaveAcesso:      getString(venda, "chave_acesso"),

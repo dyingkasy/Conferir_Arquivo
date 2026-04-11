@@ -6,6 +6,10 @@ uses
   System.SysUtils, System.Generics.Collections;
 
 type
+  TConfereFiltroValor = record
+    Valor: string;
+  end;
+
   TConfereResumo = record
     QuantidadeTotal: Integer;
     QuantidadeTransmitida: Integer;
@@ -28,6 +32,7 @@ type
   TConfereNotaConsulta = record
     SourceID: Integer;
     InstalacaoID: string;
+    NomeComputador: string;
     GrupoConferencia: string;
     DataVenda: string;
     HoraVenda: string;
@@ -69,14 +74,16 @@ type
     constructor Create(const ABaseUrl, AToken: string);
     function Health: string;
     function LoadEmpresas: TArray<TConfereEmpresaDisponivel>;
-    function LoadResumo(const ACNPJ, ADataInicial, ADataFinal: string; ADias: Integer): TConfereResumo;
-    function LoadLista(const ACNPJ, AStatus, ADataInicial, ADataFinal: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
+    function LoadSeries(const ACNPJ: string): TArray<TConfereFiltroValor>;
+    function LoadComputadores(const ACNPJ: string): TArray<TConfereFiltroValor>;
+    function LoadResumo(const ACNPJ, ADataInicial, ADataFinal, ASerie, ANomeComputador: string; ADias: Integer): TConfereResumo;
+    function LoadLista(const ACNPJ, AStatus, ADataInicial, ADataFinal, ASerie, ANomeComputador: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
   end;
 
 implementation
 
 uses
-  System.JSON, System.StrUtils, System.Net.HttpClient, System.Net.HttpClientComponent, System.Net.URLClient;
+  System.JSON, System.StrUtils, System.NetEncoding, System.Net.HttpClient, System.Net.HttpClientComponent, System.Net.URLClient;
 
 constructor TConfereOfficeClient.Create(const ABaseUrl, AToken: string);
 begin
@@ -159,7 +166,72 @@ begin
   end;
 end;
 
-function TConfereOfficeClient.LoadResumo(const ACNPJ, ADataInicial, ADataFinal: string; ADias: Integer): TConfereResumo;
+function TConfereOfficeClient.LoadSeries(const ACNPJ: string): TArray<TConfereFiltroValor>;
+var
+  Raw: string;
+  Json: TJSONObject;
+  Arr: TJSONArray;
+  I: Integer;
+  ItemObj: TJSONObject;
+  Item: TConfereFiltroValor;
+  List: TList<TConfereFiltroValor>;
+begin
+  Raw := GetJson(BuildUrl('/api/v1/nfce/series?cnpj_empresa=' + ACNPJ));
+  Json := TJSONObject.ParseJSONValue(Raw) as TJSONObject;
+  List := TList<TConfereFiltroValor>.Create;
+  try
+    if not Assigned(Json) then
+      raise Exception.Create('JSON invalido na lista de series.');
+    Arr := Json.GetValue<TJSONArray>('items');
+    if Assigned(Arr) then
+      for I := 0 to Arr.Count - 1 do
+      begin
+        ItemObj := Arr.Items[I] as TJSONObject;
+        FillChar(Item, SizeOf(Item), 0);
+        Item.Valor := ItemObj.GetValue<string>('valor', '');
+        List.Add(Item);
+      end;
+    Result := List.ToArray;
+  finally
+    List.Free;
+    Json.Free;
+  end;
+end;
+
+function TConfereOfficeClient.LoadComputadores(const ACNPJ: string): TArray<TConfereFiltroValor>;
+var
+  Raw: string;
+  Json: TJSONObject;
+  Arr: TJSONArray;
+  I: Integer;
+  ItemObj: TJSONObject;
+  Item: TConfereFiltroValor;
+  List: TList<TConfereFiltroValor>;
+begin
+  Raw := GetJson(BuildUrl('/api/v1/nfce/computadores?cnpj_empresa=' + ACNPJ));
+  Json := TJSONObject.ParseJSONValue(Raw) as TJSONObject;
+  List := TList<TConfereFiltroValor>.Create;
+  try
+    if not Assigned(Json) then
+      raise Exception.Create('JSON invalido na lista de computadores.');
+    Arr := Json.GetValue<TJSONArray>('items');
+    if Assigned(Arr) then
+      for I := 0 to Arr.Count - 1 do
+      begin
+        ItemObj := Arr.Items[I] as TJSONObject;
+        FillChar(Item, SizeOf(Item), 0);
+        Item.Valor := ItemObj.GetValue<string>('valor', '');
+        List.Add(Item);
+      end;
+    Result := List.ToArray;
+  finally
+    List.Free;
+    Json.Free;
+  end;
+end;
+
+function TConfereOfficeClient.LoadResumo(const ACNPJ, ADataInicial, ADataFinal,
+  ASerie, ANomeComputador: string; ADias: Integer): TConfereResumo;
 var
   Json: TJSONObject;
   Raw: string;
@@ -171,6 +243,10 @@ begin
     Url := Url + '&data_inicial=' + ADataInicial + '&data_final=' + ADataFinal
   else
     Url := Url + '&dias=' + IntToStr(ADias);
+  if Trim(ASerie) <> '' then
+    Url := Url + '&serie_nfce=' + ASerie;
+  if Trim(ANomeComputador) <> '' then
+    Url := Url + '&nome_computador=' + TNetEncoding.URL.Encode(ANomeComputador);
 
   Raw := GetJson(BuildUrl(Url));
   Json := TJSONObject.ParseJSONValue(Raw) as TJSONObject;
@@ -199,7 +275,7 @@ begin
 end;
 
 function TConfereOfficeClient.LoadLista(const ACNPJ, AStatus, ADataInicial,
-  ADataFinal: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
+  ADataFinal, ASerie, ANomeComputador: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
 var
   Url, Raw: string;
   Json: TJSONObject;
@@ -216,6 +292,10 @@ begin
     Url := Url + '&data_inicial=' + ADataInicial;
   if Trim(ADataFinal) <> '' then
     Url := Url + '&data_final=' + ADataFinal;
+  if Trim(ASerie) <> '' then
+    Url := Url + '&serie_nfce=' + ASerie;
+  if Trim(ANomeComputador) <> '' then
+    Url := Url + '&nome_computador=' + TNetEncoding.URL.Encode(ANomeComputador);
 
   Raw := GetJson(BuildUrl(Url));
   Json := TJSONObject.ParseJSONValue(Raw) as TJSONObject;
@@ -231,6 +311,7 @@ begin
         FillChar(Item, SizeOf(Item), 0);
         Item.SourceID := ItemObj.GetValue<Integer>('source_id', 0);
         Item.InstalacaoID := ItemObj.GetValue<string>('instalacao_id', '');
+        Item.NomeComputador := ItemObj.GetValue<string>('nome_computador', '');
         Item.GrupoConferencia := ItemObj.GetValue<string>('grupo_conferencia', '');
         Item.DataVenda := ItemObj.GetValue<string>('data_venda', '');
         Item.HoraVenda := ItemObj.GetValue<string>('hora_venda', '');
