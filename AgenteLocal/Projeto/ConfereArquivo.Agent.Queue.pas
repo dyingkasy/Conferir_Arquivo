@@ -13,6 +13,7 @@ type
     FConnection: TFDConnection;
     procedure EnsureConnected;
     function ExecuteScalarInt(const ASQL: string; AParamName: string = ''; AParamValue: Integer = 0): Integer;
+    function ColumnExists(const ATable, AColumn: string): Boolean;
   public
     constructor Create(const ADatabasePath: string);
     destructor Destroy; override;
@@ -59,6 +60,27 @@ begin
     FConnection.Connected := True;
 end;
 
+function TConfereAgentQueue.ColumnExists(const ATable, AColumn: string): Boolean;
+var
+  Q: TFDQuery;
+begin
+  Result := False;
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := FConnection;
+    Q.SQL.Text := 'pragma table_info(' + ATable + ')';
+    Q.Open;
+    while not Q.Eof do
+    begin
+      if SameText(Q.FieldByName('name').AsString, AColumn) then
+        Exit(True);
+      Q.Next;
+    end;
+  finally
+    Q.Free;
+  end;
+end;
+
 procedure TConfereAgentQueue.EnsureSchema;
 var
   Q: TFDQuery;
@@ -88,6 +110,7 @@ begin
       'create table if not exists outbound_queue (' +
       '  id integer primary key autoincrement,' +
       '  source_id integer not null,' +
+      '  hash_incremento integer default 0,' +
       '  payload_json text not null,' +
       '  send_attempts integer default 0,' +
       '  created_at text not null,' +
@@ -95,6 +118,12 @@ begin
       '  last_error text' +
       ');';
     Q.ExecSQL;
+
+    if not ColumnExists('outbound_queue', 'hash_incremento') then
+    begin
+      Q.SQL.Text := 'alter table outbound_queue add column hash_incremento integer default 0';
+      Q.ExecSQL;
+    end;
   finally
     Q.Free;
   end;
@@ -188,9 +217,10 @@ begin
     Q.Connection := FConnection;
 
     Q.SQL.Text :=
-      'insert into outbound_queue(source_id, payload_json, send_attempts, created_at) ' +
-      'values (:source_id, :payload_json, 0, :created_at)';
+      'insert into outbound_queue(source_id, hash_incremento, payload_json, send_attempts, created_at) ' +
+      'values (:source_id, :hash_incremento, :payload_json, 0, :created_at)';
     Q.ParamByName('source_id').AsInteger := AItem.SourceID;
+    Q.ParamByName('hash_incremento').AsInteger := AItem.HashIncremento;
     Q.ParamByName('payload_json').AsString := APayloadJson;
     Q.ParamByName('created_at').AsString := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
     Q.ExecSQL;
@@ -220,7 +250,7 @@ begin
   try
     Q.Connection := FConnection;
     Q.SQL.Text :=
-      'select id, source_id, payload_json, send_attempts ' +
+      'select id, source_id, hash_incremento, payload_json, send_attempts ' +
       'from outbound_queue where sent_at is null order by id limit :lim';
     Q.ParamByName('lim').AsInteger := ALimit;
     Q.Open;
@@ -228,6 +258,7 @@ begin
     begin
       Item.QueueID := Q.FieldByName('id').AsInteger;
       Item.SourceID := Q.FieldByName('source_id').AsInteger;
+      Item.HashIncremento := Q.FieldByName('hash_incremento').AsInteger;
       Item.PayloadJson := Q.FieldByName('payload_json').AsString;
       Item.Attempts := Q.FieldByName('send_attempts').AsInteger;
       L.Add(Item);

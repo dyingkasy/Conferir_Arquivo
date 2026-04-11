@@ -75,6 +75,7 @@ type
     SourceID: Integer;
     PayloadJson: string;
     Attempts: Integer;
+    HashIncremento: Integer;
   end;
 
 function ConfereStatusToString(const AStatus: TConfereNFCeStatus): string;

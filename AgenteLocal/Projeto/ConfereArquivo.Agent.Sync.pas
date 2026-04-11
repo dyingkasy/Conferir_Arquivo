@@ -155,6 +155,9 @@ begin
     if Item.SourceID > MaxID then
       MaxID := Item.SourceID;
 
+    if FSource.IsSynced(Item) then
+      Continue;
+
     if not FQueue.ShouldEnqueue(Item) then
       Continue;
 
@@ -194,6 +197,10 @@ begin
   begin
     if Item.SourceID > MaxID then
       MaxID := Item.SourceID;
+
+    if FSource.IsSynced(Item) then
+      Continue;
+
     Payload := BuildNFCeJson(FEmpresa, Item);
     try
       FQueue.Enqueue(Item, Payload.ToJSON);
@@ -249,7 +256,10 @@ begin
         if (Resp.StatusCode >= 200) and (Resp.StatusCode < 300) then
         begin
           for Item in Pending do
+          begin
             FQueue.MarkSent(Item.QueueID);
+            FSource.MarkAsSynced(Item.SourceID, Item.HashIncremento, '');
+          end;
           ConfereLogOperational(Format('Lote enviado com sucesso. Quantidade: %d', [Length(Pending)]));
         end
         else
