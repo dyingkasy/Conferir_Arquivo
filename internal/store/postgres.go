@@ -947,7 +947,7 @@ func buildNFeSaidaEspelhoRow(cnpj, instalacaoID string, rawNota []byte, remoteIP
 	if row.StatusOperacional == "" {
 		if strings.EqualFold(strings.TrimSpace(row.StatusCancelado), "S") {
 			row.StatusOperacional = "CANCELADA"
-		} else if strings.TrimSpace(row.Protocolo) <> "" {
+		} else if strings.TrimSpace(row.Protocolo) != "" {
 			row.StatusOperacional = "AUTORIZADA"
 		} else {
 			row.StatusOperacional = "NAO_AUTORIZADA"
