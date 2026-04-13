@@ -44,9 +44,9 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     object lblSubtitulo: TLabel
       Left = 20
       Top = 53
-      Width = 571
+      Width = 712
       Height = 17
-      Caption = 'Painel ainda consulta somente NFC-e. Nesta etapa o agente coleta NFC-e e NFe Saida e envia os dois espelhos para a VPS.'
+      Caption = 'Painel ainda consulta NFC-e, NFe Saida e NFe Entrada por tipo separado. O agente coleta os tres espelhos e envia tudo para a VPS.'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = 15724527
       Font.Height = -13
@@ -91,6 +91,14 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
       Height = 17
       Caption = 'Ativar NFe Saida'
       TabOrder = 2
+    end
+    object chkAtivarNFeEntrada: TCheckBox
+      Left = 361
+      Top = 109
+      Width = 133
+      Height = 17
+      Caption = 'Ativar NFe Entrada'
+      TabOrder = 6
     end
     object lblUsuario: TLabel
       Left = 16

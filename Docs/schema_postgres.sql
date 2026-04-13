@@ -174,3 +174,71 @@ create index if not exists idx_nfe_saida_espelho_cnpj_data
 
 create index if not exists idx_nfe_saida_espelho_cnpj_numero
   on nfe_saida_cabecalho_espelho (cnpj_empresa, numero_nota, serie_nota_fiscal);
+
+create table if not exists nfe_entrada_sync_lote (
+  id bigserial primary key,
+  cnpj_empresa varchar(14) not null references tenant_empresa(cnpj),
+  instalacao_id varchar(80),
+  quantidade integer not null,
+  remote_ip varchar(60),
+  raw_json jsonb not null,
+  gerado_em timestamp null,
+  created_at timestamp not null default current_timestamp
+);
+
+create index if not exists idx_nfe_entrada_sync_lote_cnpj_created_at
+  on nfe_entrada_sync_lote (cnpj_empresa, created_at desc);
+
+create table if not exists nfe_entrada_cabecalho_espelho (
+  id bigserial primary key,
+  cnpj_empresa varchar(14) not null references tenant_empresa(cnpj),
+  source_id integer not null,
+  instalacao_id varchar(80),
+  nome_computador varchar(120),
+  id_empresa integer,
+  data_emissao date,
+  data_entrada date,
+  tipo_entrada varchar(5),
+  numero_nota varchar(20),
+  serie_nota varchar(10),
+  codigo_modelo integer,
+  total_entrada numeric(18,6),
+  acrescimo numeric(18,6),
+  desconto numeric(18,6),
+  frete numeric(18,6),
+  icms_frete numeric(18,6),
+  base_sub_trib numeric(18,6),
+  valor_icms_sub numeric(18,6),
+  total_produtos numeric(18,6),
+  valor_abatimento numeric(18,6),
+  valor_seguro numeric(18,6),
+  valor_outras_despesas numeric(18,6),
+  base_icms numeric(18,6),
+  valor_icms numeric(18,6),
+  valor_ipi numeric(18,6),
+  valor_pis numeric(18,6),
+  valor_cofins numeric(18,6),
+  valor_pis_st numeric(18,6),
+  valor_cofins_st numeric(18,6),
+  valor_st numeric(18,6),
+  chave_acesso varchar(44),
+  nome_xml varchar(180),
+  web varchar(10),
+  uf_fornecedor varchar(10),
+  ie_fornecedor varchar(30),
+  documento_fornecedor varchar(30),
+  cod_fornecedor integer,
+  hash_incremento integer,
+  status_operacional varchar(40),
+  payload_json jsonb not null,
+  remote_ip varchar(60),
+  updated_at timestamp not null default current_timestamp,
+  created_at timestamp not null default current_timestamp,
+  constraint uq_nfe_entrada_espelho unique(cnpj_empresa, source_id)
+);
+
+create index if not exists idx_nfe_entrada_espelho_cnpj_data
+  on nfe_entrada_cabecalho_espelho (cnpj_empresa, data_emissao desc);
+
+create index if not exists idx_nfe_entrada_espelho_cnpj_numero
+  on nfe_entrada_cabecalho_espelho (cnpj_empresa, numero_nota, serie_nota);

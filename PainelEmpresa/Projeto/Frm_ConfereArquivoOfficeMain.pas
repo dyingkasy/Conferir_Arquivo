@@ -3,7 +3,7 @@ unit Frm_ConfereArquivoOfficeMain;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, System.Math, System.DateUtils,
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, System.Math, System.DateUtils, System.StrUtils,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
   Vcl.ComCtrls,
   Vcl.Grids, ConfereArquivo.Office.Config, ConfereArquivo.Office.Client;
@@ -93,7 +93,9 @@ type
     FEmpresas: TArray<TConfereEmpresaDisponivel>;
     FVisibleEmpresas: TArray<Integer>;
     function CurrentDocType: string;
+    function CurrentDocLabel: string;
     function IsNFeSaida: Boolean;
+    function IsNFeEntrada: Boolean;
     function FriendlyStatus(const AGrupo, AStatus: string): string;
     procedure ApplyVisualStyle;
     procedure StyleReadOnlyEdit(AEdit: TEdit; const AColor: TColor);
@@ -101,6 +103,9 @@ type
     procedure LoadScreen;
     procedure SaveScreen;
     procedure ApplyGridHeader;
+    procedure ClearResumo;
+    procedure ClearLista;
+    procedure ResetConsultaView;
     procedure Log(const AText: string);
     procedure LoadEmpresas;
     procedure ApplyCompanyFilter;
@@ -129,6 +134,7 @@ begin
   LoadScreen;
   ApplyVisualStyle;
   ApplyGridHeader;
+  ResetConsultaView;
   try
     LoadEmpresas;
   except
@@ -210,9 +216,11 @@ procedure TFrmConfereArquivoOfficeMain.LoadScreen;
 begin
   edApi.Text := FConfig.ApiBaseUrl;
   edToken.Text := FConfig.ApiToken;
-  cbDocumento.Items.Text := 'NFC-e'#13#10'NFe Saida';
+  cbDocumento.Items.Text := 'NFC-e'#13#10'NFe Saida'#13#10'NFe Entrada';
   if FConfig.DocumentoTipo = 'NFE_SAIDA' then
     cbDocumento.ItemIndex := 1
+  else if FConfig.DocumentoTipo = 'NFE_ENTRADA' then
+    cbDocumento.ItemIndex := 2
   else
     cbDocumento.ItemIndex := 0;
   cbSerie.Items.Text := 'TODAS';
@@ -247,15 +255,22 @@ begin
   sgNotas.Cells[1,0] := 'Hora';
   sgNotas.Cells[2,0] := 'Grupo';
   sgNotas.Cells[3,0] := 'Status Final';
-  if IsNFeSaida then
-    sgNotas.Cells[4,0] := 'Saida'
+  if IsNFeSaida or IsNFeEntrada then
+    sgNotas.Cells[4,0] := 'Data saida'
   else
-    sgNotas.Cells[4,0] := 'Transm.';
-  if IsNFeSaida then
-    sgNotas.Cells[5,0] := 'Nota'
+    sgNotas.Cells[4,0] := 'Data transm.';
+  if IsNFeEntrada then
+    sgNotas.Cells[5,0] := 'Numero NF-e Ent.'
+  else if IsNFeSaida then
+    sgNotas.Cells[5,0] := 'Numero NF-e'
   else
-    sgNotas.Cells[5,0] := 'Numero';
-  sgNotas.Cells[6,0] := 'Serie';
+    sgNotas.Cells[5,0] := 'Numero NFC-e';
+  if IsNFeEntrada then
+    sgNotas.Cells[6,0] := 'Serie NF-e Ent.'
+  else if IsNFeSaida then
+    sgNotas.Cells[6,0] := 'Serie NF-e'
+  else
+    sgNotas.Cells[6,0] := 'Serie NFC-e';
   sgNotas.Cells[7,0] := 'Valor';
   sgNotas.Cells[8,0] := 'ICMS';
   sgNotas.Cells[9,0] := 'PIS';
@@ -263,13 +278,13 @@ begin
   sgNotas.Cells[11,0] := 'Computador';
   sgNotas.Cells[12,0] := 'Cliente';
   sgNotas.Cells[13,0] := 'Protocolo';
-  sgNotas.ColWidths[0] := 72;
+  sgNotas.ColWidths[0] := 78;
   sgNotas.ColWidths[1] := 58;
-  sgNotas.ColWidths[2] := 92;
-  sgNotas.ColWidths[3] := 130;
-  sgNotas.ColWidths[4] := 72;
-  sgNotas.ColWidths[5] := 70;
-  sgNotas.ColWidths[6] := 42;
+  sgNotas.ColWidths[2] := 110;
+  sgNotas.ColWidths[3] := 136;
+  sgNotas.ColWidths[4] := 82;
+  sgNotas.ColWidths[5] := 86;
+  sgNotas.ColWidths[6] := 76;
   sgNotas.ColWidths[7] := 76;
   sgNotas.ColWidths[8] := 66;
   sgNotas.ColWidths[9] := 60;
@@ -279,12 +294,60 @@ begin
   sgNotas.ColWidths[13] := 148;
 end;
 
+procedure TFrmConfereArquivoOfficeMain.ClearResumo;
+begin
+  edTotal.Clear;
+  edTransmitidas.Clear;
+  edContingencia.Clear;
+  edSemFiscal.Clear;
+  edErro.Clear;
+  edValorTotal.Clear;
+  edValorTransmitido.Clear;
+  edValorCont.Clear;
+  edValorSemFiscal.Clear;
+  edValorErro.Clear;
+  edTribBase.Clear;
+  edTribICMS.Clear;
+  edTribPIS.Clear;
+  edTribCOFINS.Clear;
+  edTribFederal.Clear;
+  edTribEstadual.Clear;
+end;
+
+procedure TFrmConfereArquivoOfficeMain.ClearLista;
+var
+  Col: Integer;
+begin
+  sgNotas.RowCount := 2;
+  for Col := 0 to sgNotas.ColCount - 1 do
+    sgNotas.Cells[Col, 1] := '';
+end;
+
+procedure TFrmConfereArquivoOfficeMain.ResetConsultaView;
+begin
+  ClearResumo;
+  ApplyGridHeader;
+  ClearLista;
+end;
+
 function TFrmConfereArquivoOfficeMain.CurrentDocType: string;
 begin
   if cbDocumento.ItemIndex = 1 then
     Result := 'NFE_SAIDA'
+  else if cbDocumento.ItemIndex = 2 then
+    Result := 'NFE_ENTRADA'
   else
     Result := 'NFCE';
+end;
+
+function TFrmConfereArquivoOfficeMain.CurrentDocLabel: string;
+begin
+  if IsNFeEntrada then
+    Result := 'NFe Entrada'
+  else if IsNFeSaida then
+    Result := 'NFe Saida'
+  else
+    Result := 'NFC-e';
 end;
 
 function TFrmConfereArquivoOfficeMain.IsNFeSaida: Boolean;
@@ -292,15 +355,44 @@ begin
   Result := CurrentDocType = 'NFE_SAIDA';
 end;
 
+function TFrmConfereArquivoOfficeMain.IsNFeEntrada: Boolean;
+begin
+  Result := CurrentDocType = 'NFE_ENTRADA';
+end;
+
 procedure TFrmConfereArquivoOfficeMain.UpdateDocumentMode;
 begin
   cbStatus.Items.BeginUpdate;
   try
     cbStatus.Items.Clear;
-    if IsNFeSaida then
+    lblDocumento.Caption := 'Tipo de documento';
+    lblSerie.Caption := 'Serie';
+    lblComputador.Caption := 'Computador';
+    if IsNFeEntrada then
     begin
+      gbFiltros.Caption := 'Filtros - NFe Entrada';
+      gbResumo.Caption := 'Resumo Operacional - NFe Entrada';
+      gbTributos.Caption := 'Resumo Tributario - NFe Entrada';
+      cbStatus.Items.Text := 'TODOS'#13#10'AUTORIZADA'#13#10'NAO_AUTORIZADA';
+      lblSubtitulo.Caption := 'Consulta atual: NFe Entrada. Esta tela ainda separa NFC-e, NFe Saida e NFe Entrada por tipo.';
+      lblStatus.Caption := 'Status NFe Entrada';
+      lblTransmitidas.Caption := 'Autorizadas';
+      lblContingencia.Caption := 'Nao usado';
+      lblSemFiscal.Caption := 'Nao autorizadas';
+      lblErro.Caption := 'Nao usado';
+      lblValorTransmitido.Caption := 'Valor autorizadas';
+      lblValorCont.Caption := 'Valor nao usado';
+      lblValorSemFiscal.Caption := 'Valor nao autoriz.';
+      lblValorErro.Caption := 'Valor nao usado';
+    end
+    else if IsNFeSaida then
+    begin
+      gbFiltros.Caption := 'Filtros - NFe Saida';
+      gbResumo.Caption := 'Resumo Operacional - NFe Saida';
+      gbTributos.Caption := 'Resumo Tributario - NFe Saida';
       cbStatus.Items.Text := 'TODOS'#13#10'AUTORIZADA'#13#10'CANCELADA'#13#10'NAO_AUTORIZADA';
-      lblSubtitulo.Caption := 'Consulta atual: NFe Saida. NFC-e e NFe Saida ficam separadas por tipo de documento.';
+      lblSubtitulo.Caption := 'Consulta atual: NFe Saida. Este filtro vale somente para NFe Saida; NFC-e fica em consulta separada.';
+      lblStatus.Caption := 'Status NFe Saida';
       lblTransmitidas.Caption := 'Autorizadas';
       lblContingencia.Caption := 'Canceladas';
       lblSemFiscal.Caption := 'Nao autorizadas';
@@ -312,8 +404,12 @@ begin
     end
     else
     begin
+      gbFiltros.Caption := 'Filtros - NFC-e';
+      gbResumo.Caption := 'Resumo Operacional - NFC-e';
+      gbTributos.Caption := 'Resumo Tributario - NFC-e';
       cbStatus.Items.Text := 'TODOS'#13#10'TRANSMITIDA'#13#10'CONTINGENCIA'#13#10'ERRO'#13#10'SEM_FISCAL';
-      lblSubtitulo.Caption := 'Consulta atual: NFC-e e NFe Saida separadas por tipo de documento.';
+      lblSubtitulo.Caption := 'Consulta atual: NFC-e. NFe Saida fica em consulta separada pelo tipo de documento.';
+      lblStatus.Caption := 'Status NFC-e';
       lblTransmitidas.Caption := 'Transmitidas';
       lblContingencia.Caption := 'Contingencia';
       lblSemFiscal.Caption := 'Sem fiscal';
@@ -337,6 +433,28 @@ var
 begin
   Grupo := UpperCase(Trim(AGrupo));
   Status := UpperCase(Trim(AStatus));
+
+  if IsNFeEntrada then
+  begin
+    if (Grupo = 'AUTORIZADA') or (Status = 'AUTORIZADA') then
+      Exit('AUTORIZADA');
+    if (Grupo = 'NAO_AUTORIZADA') or (Status = 'NAO_AUTORIZADA') then
+      Exit('NAO AUTORIZADA');
+    Result := Trim(AStatus);
+    Exit;
+  end;
+
+  if IsNFeSaida then
+  begin
+    if (Grupo = 'AUTORIZADA') or (Status = 'AUTORIZADA') then
+      Exit('AUTORIZADA');
+    if (Grupo = 'CANCELADA') or (Status = 'CANCELADA') then
+      Exit('CANCELADA');
+    if (Grupo = 'NAO_AUTORIZADA') or (Status = 'NAO_AUTORIZADA') then
+      Exit('NAO AUTORIZADA');
+    Result := Trim(AStatus);
+    Exit;
+  end;
 
   if Grupo = 'TRANSMITIDA' then
     Exit('AUTORIZADA');
@@ -394,12 +512,15 @@ begin
     cbComputador.Items.Add('TODOS');
 
     if Trim(FConfig.CNPJEmpresa) = '' then
+    begin
+      ResetConsultaView;
       Exit;
+    end;
 
-  Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
-  try
-    Series := Client.LoadSeries(CurrentDocType, FConfig.CNPJEmpresa);
-    Computadores := Client.LoadComputadores(CurrentDocType, FConfig.CNPJEmpresa);
+    Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
+    try
+      Series := Client.LoadSeries(CurrentDocType, FConfig.CNPJEmpresa);
+      Computadores := Client.LoadComputadores(CurrentDocType, FConfig.CNPJEmpresa);
     finally
       Client.Free;
     end;
@@ -454,6 +575,7 @@ begin
     lbEmpresas.Items.EndUpdate;
   end;
   LoadFiltroOpcoes;
+  ResetConsultaView;
 end;
 
 function TFrmConfereArquivoOfficeMain.GetSelectedEmpresaIndex: Integer;
@@ -514,7 +636,7 @@ procedure TFrmConfereArquivoOfficeMain.LoadLista;
 var
   Client: TConfereOfficeClient;
   Items: TArray<TConfereNotaConsulta>;
-  I: Integer;
+  I, Row: Integer;
   StatusValue: string;
   SerieFiltro: string;
   ComputadorFiltro: string;
@@ -542,6 +664,9 @@ begin
       ComputadorFiltro,
       250);
     sgNotas.RowCount := Max(Length(Items) + 1, 2);
+    for Row := 1 to sgNotas.RowCount - 1 do
+      for I := 0 to sgNotas.ColCount - 1 do
+        sgNotas.Cells[I, Row] := '';
     for I := 0 to Length(Items) - 1 do
     begin
       sgNotas.Cells[0, I + 1] := Items[I].DataVenda;
@@ -571,7 +696,7 @@ begin
     raise Exception.Create('Selecione uma empresa para consultar.');
   LoadResumo;
   LoadLista;
-  Log('Consulta executada com sucesso.');
+  Log('Consulta executada com sucesso para ' + CurrentDocLabel + '.');
 end;
 
 procedure TFrmConfereArquivoOfficeMain.btnEmpresasClick(Sender: TObject);
@@ -602,8 +727,11 @@ end;
 
 procedure TFrmConfereArquivoOfficeMain.cbDocumentoChange(Sender: TObject);
 begin
+  SaveScreen;
   UpdateDocumentMode;
+  ResetConsultaView;
   LoadFiltroOpcoes;
+  Log('Filtro de documento alterado para ' + CurrentDocLabel + '.');
 end;
 
 procedure TFrmConfereArquivoOfficeMain.edEmpresaFiltroChange(Sender: TObject);
@@ -621,6 +749,7 @@ begin
     FConfig.CNPJEmpresa := FEmpresas[EmpresaIdx].CNPJ;
     SaveOfficeConfig(FConfig);
     LoadFiltroOpcoes;
+    ResetConsultaView;
   end;
 end;
 
@@ -640,15 +769,20 @@ begin
   else
   begin
     Text := UpperCase(Grid.Cells[2, ARow]);
-    if Text = 'TRANSMITIDA' then
+    if (Text = 'TRANSMITIDA') or (Text = 'AUTORIZADA') then
     begin
       FillColor := $00EAF6EA;
       FontColor := $001F5E2E;
     end
-    else if Text = 'CONTINGENCIA' then
+    else if (Text = 'CONTINGENCIA') or (Text = 'CANCELADA') then
     begin
       FillColor := $00EEF4FF;
       FontColor := $00694A00;
+    end
+    else if Text = 'NAO_AUTORIZADA' then
+    begin
+      FillColor := $00F8F1E8;
+      FontColor := $007A3E00;
     end
     else if Text = 'ERRO' then
     begin

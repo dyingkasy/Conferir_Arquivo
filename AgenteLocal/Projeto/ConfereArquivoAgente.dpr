@@ -14,6 +14,7 @@ uses
   ConfereArquivo.Agent.Config in 'ConfereArquivo.Agent.Config.pas',
   ConfereArquivo.Agent.Source in 'ConfereArquivo.Agent.Source.pas',
   ConfereArquivo.Agent.SourceNFeSaida in 'ConfereArquivo.Agent.SourceNFeSaida.pas',
+  ConfereArquivo.Agent.SourceNFeEntrada in 'ConfereArquivo.Agent.SourceNFeEntrada.pas',
   ConfereArquivo.Agent.Queue in 'ConfereArquivo.Agent.Queue.pas',
   ConfereArquivo.Agent.Sync in 'ConfereArquivo.Agent.Sync.pas',
   ConfereArquivo.Types in '..\..\Common\ConfereArquivo.Types.pas',

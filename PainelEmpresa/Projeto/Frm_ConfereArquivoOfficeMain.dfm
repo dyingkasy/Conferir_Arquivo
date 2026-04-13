@@ -186,12 +186,12 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
       Left = 8
       Top = 10
       Width = 940
-      Height = 74
+      Height = 86
       Align = alTop
-      Caption = 'Filtros'
+      Caption = 'Filtros da consulta'
       TabOrder = 0
       object lblStatus: TLabel
-        Left = 164
+        Left = 174
         Top = 23
         Width = 33
         Height = 15
@@ -205,37 +205,37 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Caption = 'Documento'
       end
       object lblDataInicial: TLabel
-        Left = 238
+        Left = 356
         Top = 23
         Width = 57
         Height = 15
         Caption = 'Data inicial'
       end
       object lblDataFinal: TLabel
-        Left = 352
+        Left = 478
         Top = 23
         Width = 50
         Height = 15
         Caption = 'Data final'
       end
       object lblSerie: TLabel
-        Left = 466
+        Left = 600
         Top = 23
         Width = 27
         Height = 15
         Caption = 'Serie'
       end
       object lblComputador: TLabel
-        Left = 612
+        Left = 712
         Top = 23
         Width = 68
         Height = 15
         Caption = 'Computador'
       end
       object cbStatus: TComboBox
-        Left = 164
+        Left = 174
         Top = 40
-        Width = 160
+        Width = 170
         Height = 23
         Style = csDropDownList
         TabOrder = 1
@@ -243,16 +243,16 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
       object cbDocumento: TComboBox
         Left = 12
         Top = 40
-        Width = 136
+        Width = 150
         Height = 23
         Style = csDropDownList
         TabOrder = 0
         OnChange = cbDocumentoChange
       end
       object dtDataInicial: TDateTimePicker
-        Left = 340
+        Left = 356
         Top = 40
-        Width = 96
+        Width = 110
         Height = 23
         Date = 46022.000000000000000000
         Time = 0.000000000000000000
@@ -260,9 +260,9 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         TabOrder = 2
       end
       object dtDataFinal: TDateTimePicker
-        Left = 454
+        Left = 478
         Top = 40
-        Width = 96
+        Width = 110
         Height = 23
         Date = 46022.000000000000000000
         Time = 0.000000000000000000
@@ -270,25 +270,25 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         TabOrder = 3
       end
       object cbSerie: TComboBox
-        Left = 566
+        Left = 600
         Top = 40
-        Width = 112
+        Width = 100
         Height = 23
         Style = csDropDownList
         TabOrder = 4
       end
       object cbComputador: TComboBox
-        Left = 694
+        Left = 712
         Top = 40
-        Width = 150
+        Width = 130
         Height = 23
         Style = csDropDownList
         TabOrder = 5
       end
       object btnConsultar: TButton
-        Left = 856
-        Top = 37
-        Width = 68
+        Left = 850
+        Top = 36
+        Width = 76
         Height = 28
         Caption = 'Consultar'
         TabOrder = 6

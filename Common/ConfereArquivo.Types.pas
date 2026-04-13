@@ -6,7 +6,7 @@ uses
   System.SysUtils;
 
 const
-  CONFERE_SYNC_REVISION = 4;
+  CONFERE_SYNC_REVISION = 5;
 
 type
   TConfereNFCeStatus = (
@@ -80,6 +80,45 @@ type
     StatusOperacional: string;
   end;
 
+  TConfereNFeEntradaRecord = record
+    SourceID: Integer;
+    IDEmpresa: Integer;
+    DataEmissao: TDateTime;
+    DataEntrada: TDateTime;
+    TipoEntrada: string;
+    NumeroNota: string;
+    SerieNota: string;
+    CodigoModelo: Integer;
+    TotalEntrada: Currency;
+    Acrescimo: Currency;
+    Desconto: Currency;
+    Frete: Currency;
+    ICMSFrete: Currency;
+    BaseSubTrib: Currency;
+    ValorICMSSub: Currency;
+    TotalProdutos: Currency;
+    ValorAbatimento: Currency;
+    ValorSeguro: Currency;
+    ValorOutrasDespesas: Currency;
+    BaseICMS: Currency;
+    ValorICMS: Currency;
+    ValorIPI: Currency;
+    ValorPIS: Currency;
+    ValorCOFINS: Currency;
+    ValorPISST: Currency;
+    ValorCOFINSST: Currency;
+    ValorST: Currency;
+    ChaveAcesso: string;
+    NomeXML: string;
+    Web: string;
+    UF: string;
+    IE: string;
+    DocumentoFornecedor: string;
+    CodFornecedor: Integer;
+    HashIncremento: Integer;
+    StatusOperacional: string;
+  end;
+
   TConfereNFCeRecord = record
     SourceID: Integer;
     IDECFMovimento: Integer;
@@ -128,6 +167,7 @@ type
 function ConfereStatusToString(const AStatus: TConfereNFCeStatus): string;
 function ConfereStatusFromRecord(const ARecord: TConfereNFCeRecord): TConfereNFCeStatus;
 function ConfereNFeSaidaStatusFromRecord(const ARecord: TConfereNFeSaidaRecord): string;
+function ConfereNFeEntradaStatusFromRecord(const ARecord: TConfereNFeEntradaRecord): string;
 function NormalizeDigits(const AValue: string): string;
 
 implementation
@@ -209,6 +249,14 @@ begin
     Exit('CANCELADA');
 
   if Trim(ARecord.Protocolo) <> '' then
+    Exit('AUTORIZADA');
+
+  Result := 'NAO_AUTORIZADA';
+end;
+
+function ConfereNFeEntradaStatusFromRecord(const ARecord: TConfereNFeEntradaRecord): string;
+begin
+  if (Trim(ARecord.ChaveAcesso) <> '') or (Trim(ARecord.NomeXML) <> '') then
     Exit('AUTORIZADA');
 
   Result := 'NAO_AUTORIZADA';

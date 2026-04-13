@@ -30,6 +30,7 @@ func NewRouter(logger *slog.Logger, pgStore *store.Postgres) http.Handler {
 	r.Post("/api/v1/agente/heartbeat", handler.Heartbeat)
 	r.Post("/api/v1/nfce/lote", handler.Lote)
 	r.Post("/api/v1/nfe-saida/lote", handler.NFeSaidaLote)
+	r.Post("/api/v1/nfe-entrada/lote", handler.NFeEntradaLote)
 	r.Get("/api/v1/nfce/resumo", handler.Resumo)
 	r.Get("/api/v1/nfce/lista", handler.Lista)
 	r.Get("/api/v1/nfce/series", handler.Series)
@@ -38,6 +39,10 @@ func NewRouter(logger *slog.Logger, pgStore *store.Postgres) http.Handler {
 	r.Get("/api/v1/nfe-saida/lista", handler.NFeSaidaLista)
 	r.Get("/api/v1/nfe-saida/series", handler.NFeSaidaSeries)
 	r.Get("/api/v1/nfe-saida/computadores", handler.NFeSaidaComputadores)
+	r.Get("/api/v1/nfe-entrada/resumo", handler.NFeEntradaResumo)
+	r.Get("/api/v1/nfe-entrada/lista", handler.NFeEntradaLista)
+	r.Get("/api/v1/nfe-entrada/series", handler.NFeEntradaSeries)
+	r.Get("/api/v1/nfe-entrada/computadores", handler.NFeEntradaComputadores)
 
 	return r
 }

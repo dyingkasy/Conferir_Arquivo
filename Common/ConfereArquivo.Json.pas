@@ -10,6 +10,8 @@ function BuildNFCeJson(const AEmpresa: TConfereEmpresaInfo;
   const ARecord: TConfereNFCeRecord): TJSONObject;
 function BuildNFeSaidaJson(const AEmpresa: TConfereEmpresaInfo;
   const ARecord: TConfereNFeSaidaRecord): TJSONObject;
+function BuildNFeEntradaJson(const AEmpresa: TConfereEmpresaInfo;
+  const ARecord: TConfereNFeEntradaRecord): TJSONObject;
 function BuildLoteJson(const ACNPJ, AInstalacaoID: string;
   const AItems: TArray<TConfereQueueItem>): TJSONObject;
 
@@ -140,6 +142,63 @@ begin
     .AddPair('codigo_numerico', TJSONNumber.Create(ARecord.CodigoNumerico))
     .AddPair('documento_cliente', NormalizeDigits(ARecord.DocumentoCliente))
     .AddPair('xml_presente', TJSONBool.Create(ARecord.XMLPresent))
+    .AddPair('nome_computador', AEmpresa.NomeComputador)
+    .AddPair('hash_incremento', TJSONNumber.Create(ARecord.HashIncremento))
+    .AddPair('status_operacional', ARecord.StatusOperacional));
+end;
+
+function BuildNFeEntradaJson(const AEmpresa: TConfereEmpresaInfo;
+  const ARecord: TConfereNFeEntradaRecord): TJSONObject;
+begin
+  Result := TJSONObject.Create;
+  Result.AddPair('payload_version', TJSONNumber.Create(1));
+  Result.AddPair('empresa', TJSONObject.Create
+    .AddPair('id_empresa_erp', TJSONNumber.Create(ARecord.IDEmpresa))
+    .AddPair('cnpj', NormalizeDigits(AEmpresa.CNPJ))
+    .AddPair('razao_social', AEmpresa.RazaoSocial)
+    .AddPair('nome_fantasia', AEmpresa.NomeFantasia)
+    .AddPair('inscricao_estadual', NormalizeDigits(AEmpresa.InscricaoEstadual))
+    .AddPair('crt', AEmpresa.CRT)
+    .AddPair('tipo_regime', AEmpresa.TipoRegime)
+    .AddPair('cidade', AEmpresa.Cidade)
+    .AddPair('uf', AEmpresa.UF)
+    .AddPair('nome_computador', AEmpresa.NomeComputador));
+
+  Result.AddPair('entrada', TJSONObject.Create
+    .AddPair('source_id', TJSONNumber.Create(ARecord.SourceID))
+    .AddPair('id_empresa', TJSONNumber.Create(ARecord.IDEmpresa))
+    .AddPair('data_emissao', JsonDateOrNull(ARecord.DataEmissao))
+    .AddPair('data_entrada', JsonDateOrNull(ARecord.DataEntrada))
+    .AddPair('tipo_entrada', ARecord.TipoEntrada)
+    .AddPair('numero_nota', ARecord.NumeroNota)
+    .AddPair('serie_nota', ARecord.SerieNota)
+    .AddPair('codigo_modelo', TJSONNumber.Create(ARecord.CodigoModelo))
+    .AddPair('total_entrada', JsonNumberOrZero(ARecord.TotalEntrada))
+    .AddPair('acrescimo', JsonNumberOrZero(ARecord.Acrescimo))
+    .AddPair('desconto', JsonNumberOrZero(ARecord.Desconto))
+    .AddPair('frete', JsonNumberOrZero(ARecord.Frete))
+    .AddPair('icms_frete', JsonNumberOrZero(ARecord.ICMSFrete))
+    .AddPair('base_sub_trib', JsonNumberOrZero(ARecord.BaseSubTrib))
+    .AddPair('valor_icms_sub', JsonNumberOrZero(ARecord.ValorICMSSub))
+    .AddPair('total_produtos', JsonNumberOrZero(ARecord.TotalProdutos))
+    .AddPair('valor_abatimento', JsonNumberOrZero(ARecord.ValorAbatimento))
+    .AddPair('valor_seguro', JsonNumberOrZero(ARecord.ValorSeguro))
+    .AddPair('valor_outras_despesas', JsonNumberOrZero(ARecord.ValorOutrasDespesas))
+    .AddPair('base_icms', JsonNumberOrZero(ARecord.BaseICMS))
+    .AddPair('valor_icms', JsonNumberOrZero(ARecord.ValorICMS))
+    .AddPair('valor_ipi', JsonNumberOrZero(ARecord.ValorIPI))
+    .AddPair('valor_pis', JsonNumberOrZero(ARecord.ValorPIS))
+    .AddPair('valor_cofins', JsonNumberOrZero(ARecord.ValorCOFINS))
+    .AddPair('valor_pis_st', JsonNumberOrZero(ARecord.ValorPISST))
+    .AddPair('valor_cofins_st', JsonNumberOrZero(ARecord.ValorCOFINSST))
+    .AddPair('valor_st', JsonNumberOrZero(ARecord.ValorST))
+    .AddPair('chave_acesso', ARecord.ChaveAcesso)
+    .AddPair('nome_xml', ARecord.NomeXML)
+    .AddPair('web', ARecord.Web)
+    .AddPair('uf_fornecedor', ARecord.UF)
+    .AddPair('ie_fornecedor', ARecord.IE)
+    .AddPair('documento_fornecedor', NormalizeDigits(ARecord.DocumentoFornecedor))
+    .AddPair('cod_fornecedor', TJSONNumber.Create(ARecord.CodFornecedor))
     .AddPair('nome_computador', AEmpresa.NomeComputador)
     .AddPair('hash_incremento', TJSONNumber.Create(ARecord.HashIncremento))
     .AddPair('status_operacional', ARecord.StatusOperacional));

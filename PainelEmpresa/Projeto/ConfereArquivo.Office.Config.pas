@@ -75,7 +75,8 @@ begin
     AConfig.ApiToken := Trim(Ini.ReadString('Servidor', 'Token', ''));
     AConfig.CNPJEmpresa := Trim(Ini.ReadString('Empresa', 'CNPJ', ''));
     AConfig.DocumentoTipo := UpperCase(Trim(Ini.ReadString('Painel', 'DocumentoTipo', 'NFCE')));
-    if (AConfig.DocumentoTipo <> 'NFCE') and (AConfig.DocumentoTipo <> 'NFE_SAIDA') then
+    if (AConfig.DocumentoTipo <> 'NFCE') and (AConfig.DocumentoTipo <> 'NFE_SAIDA') and
+       (AConfig.DocumentoTipo <> 'NFE_ENTRADA') then
       AConfig.DocumentoTipo := 'NFCE';
     AConfig.DiasResumo := Ini.ReadInteger('Painel', 'DiasResumo', 7);
     if AConfig.DiasResumo <= 0 then

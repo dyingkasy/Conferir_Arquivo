@@ -20,6 +20,7 @@ type
     EnabledNFeSaida: Boolean;
     NFeSaidaDatabasePath: string;
     NFeSaidaDatabasePaths: TStringDynArray;
+    EnabledNFeEntrada: Boolean;
     FirebirdUser: string;
     FirebirdPassword: string;
     ApiBaseUrl: string;
@@ -250,6 +251,7 @@ begin
     Ini.WriteInteger('NFeSaida', 'Count', 1);
     Ini.WriteString('NFeSaida', 'Database1', ExpandFileName('C:\DEV\Confere_Arquivo\BANCO.GDB'));
     Ini.WriteBool('NFeSaida', 'Ativo', True);
+    Ini.WriteBool('NFeEntrada', 'Ativo', True);
     Ini.WriteString('Banco', 'Database', ExpandFileName('C:\DEV\Confere_Arquivo\PAFECF.FDB'));
     Ini.WriteString('Banco', 'DatabaseNFeSaida', ExpandFileName('C:\DEV\Confere_Arquivo\BANCO.GDB'));
     Ini.WriteString('Banco', 'User_Name', 'SYSDBA');
@@ -294,6 +296,7 @@ begin
       AConfig.NFeSaidaDatabasePaths := FilterDatabasePaths(
         SinglePathArray(Trim(Ini.ReadString('Banco', 'DatabaseNFeSaida', ''))));
     AConfig.EnabledNFeSaida := Ini.ReadBool('NFeSaida', 'Ativo', True);
+    AConfig.EnabledNFeEntrada := Ini.ReadBool('NFeEntrada', 'Ativo', True);
 
     ApplyDiscoveredPath(AConfig.NFCeDatabasePaths,
       ReadDiscoveredPath(IncludeTrailingPathDelimiter(AConfig.ExeRoot) + 'ConfigNFCe.ini', 'BANCO', 'LOCAL'));
@@ -344,6 +347,7 @@ begin
     SaveSectionDatabasePaths(Ini, 'NFeSaida', 'Banco', 'DatabaseNFeSaida', AConfig.NFeSaidaDatabasePaths);
     Ini.WriteBool('NFCe', 'Ativo', AConfig.EnabledNFCe);
     Ini.WriteBool('NFeSaida', 'Ativo', AConfig.EnabledNFeSaida);
+    Ini.WriteBool('NFeEntrada', 'Ativo', AConfig.EnabledNFeEntrada);
     Ini.WriteString('Banco', 'User_Name', AConfig.FirebirdUser);
     Ini.WriteString('Banco', 'Password', AConfig.FirebirdPassword);
     Ini.WriteString('Servidor', 'BaseUrl', AConfig.ApiBaseUrl);

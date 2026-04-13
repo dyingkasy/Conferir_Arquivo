@@ -17,6 +17,7 @@ type
     lblBancoNFeSaida: TLabel;
     chkAtivarNFCe: TCheckBox;
     chkAtivarNFeSaida: TCheckBox;
+    chkAtivarNFeEntrada: TCheckBox;
     lblUsuario: TLabel;
     lblSenha: TLabel;
     mmBancosNFCe: TMemo;
@@ -136,7 +137,7 @@ begin
 
   StartHidden := FindCmdLineSwitch('tray', ['-', '/'], True);
   if StartHidden then
-    HideToTray('Agente iniciado com o Windows. Coleta automatica ativa para NFC-e e NFe Saida.');
+    HideToTray('Agente iniciado com o Windows. Coleta automatica ativa para NFC-e, NFe Saida e NFe Entrada.');
 end;
 
 procedure TFrmConfereArquivoAgentMain.FormDestroy(Sender: TObject);
@@ -314,6 +315,7 @@ begin
     mmBancosNFeSaida.Lines.Add(DatabasePath);
   chkAtivarNFCe.Checked := FConfig.EnabledNFCe;
   chkAtivarNFeSaida.Checked := FConfig.EnabledNFeSaida;
+  chkAtivarNFeEntrada.Checked := FConfig.EnabledNFeEntrada;
   edUsuario.Text := FConfig.FirebirdUser;
   edSenha.Text := FConfig.FirebirdPassword;
   edApiUrl.Text := FConfig.ApiBaseUrl;
@@ -336,6 +338,7 @@ begin
   FConfig.NFeSaidaDatabasePaths := ParseMemoPaths(mmBancosNFeSaida);
   FConfig.EnabledNFCe := chkAtivarNFCe.Checked;
   FConfig.EnabledNFeSaida := chkAtivarNFeSaida.Checked;
+  FConfig.EnabledNFeEntrada := chkAtivarNFeEntrada.Checked;
   if Length(FConfig.NFCeDatabasePaths) > 0 then
     FConfig.NFCeDatabasePath := FConfig.NFCeDatabasePaths[0]
   else

@@ -263,6 +263,63 @@ func (p *Postgres) SaveNFeSaidaLote(ctx context.Context, lote model.LoteRequest,
 	return tx.Commit(ctx)
 }
 
+func (p *Postgres) SaveNFeEntradaLote(ctx context.Context, lote model.LoteRequest, token, remoteIP string) error {
+	cnpj := model.NormalizeDigits(lote.CNPJEmpresa)
+	instalacaoID := strings.TrimSpace(lote.InstalacaoID)
+	if cnpj == "" || instalacaoID == "" {
+		return errors.New("cnpj_empresa and instalacao_id are required")
+	}
+	if len(lote.Notas) == 0 {
+		return errors.New("notas is required")
+	}
+
+	if _, err := p.EnsureTenantToken(ctx, cnpj, token, ""); err != nil {
+		return err
+	}
+
+	rawPayload, err := json.Marshal(lote)
+	if err != nil {
+		return err
+	}
+
+	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if err := p.saveHeartbeatTx(ctx, tx, cnpj, instalacaoID, lote.NomeComputador, remoteIP); err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `
+		insert into nfe_entrada_sync_lote (
+			cnpj_empresa,
+			instalacao_id,
+			quantidade,
+			remote_ip,
+			raw_json,
+			gerado_em,
+			created_at
+		) values ($1, $2, $3, $4, $5::jsonb, $6, now())
+	`, cnpj, instalacaoID, lote.Quantidade, trimRemoteIP(remoteIP), string(rawPayload), parseTimestamp(lote.GeradoEm))
+	if err != nil {
+		return err
+	}
+
+	for _, rawNota := range lote.Notas {
+		row, err := buildNFeEntradaEspelhoRow(cnpj, instalacaoID, rawNota, remoteIP)
+		if err != nil {
+			return err
+		}
+		if err := p.upsertNFeEntradaEspelho(ctx, tx, row); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (p *Postgres) GetResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador string, dias int) (model.ResumoResponse, error) {
 	if dias <= 0 {
 		dias = 7
@@ -353,12 +410,13 @@ func (p *Postgres) ListEmpresas(ctx context.Context, token string) ([]model.Empr
 	rows, err := p.pool.Query(ctx, `
 		select te.cnpj,
 		       coalesce(te.razao_social, '') as razao_social,
-		       coalesce(nfce.qtd, 0)::bigint + coalesce(nfe.qtd, 0)::bigint as quantidade_xml,
+		       coalesce(nfce.qtd, 0)::bigint + coalesce(nfe.qtd, 0)::bigint + coalesce(nfe_ent.qtd, 0)::bigint as quantidade_xml,
 		       coalesce(
 		         to_char(
 		           greatest(
 		             coalesce(nfce.max_updated, timestamp '1900-01-01'),
-		             coalesce(nfe.max_updated, timestamp '1900-01-01')
+		             coalesce(nfe.max_updated, timestamp '1900-01-01'),
+		             coalesce(nfe_ent.max_updated, timestamp '1900-01-01')
 		           ),
 		           'YYYY-MM-DD HH24:MI:SS'
 		         ),
@@ -379,8 +437,13 @@ func (p *Postgres) ListEmpresas(ctx context.Context, token string) ([]model.Empr
 		      from nfe_saida_cabecalho_espelho
 		     group by cnpj_empresa
 		  ) nfe on nfe.cnpj_empresa = te.cnpj
+		  left join (
+		    select cnpj_empresa, count(*) qtd, max(updated_at) max_updated
+		      from nfe_entrada_cabecalho_espelho
+		     group by cnpj_empresa
+		  ) nfe_ent on nfe_ent.cnpj_empresa = te.cnpj
 		 where te.ativo = true
-		   and (coalesce(nfce.qtd, 0) > 0 or coalesce(nfe.qtd, 0) > 0)
+		   and (coalesce(nfce.qtd, 0) > 0 or coalesce(nfe.qtd, 0) > 0 or coalesce(nfe_ent.qtd, 0) > 0)
 		 order by te.razao_social, te.cnpj
 	`, hashToken(token))
 	if err != nil {
@@ -871,6 +934,299 @@ func (p *Postgres) ListNFeSaidaComputadores(ctx context.Context, cnpj, token str
 	return items, rows.Err()
 }
 
+func (p *Postgres) GetNFeEntradaResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador string, dias int) (model.ResumoResponse, error) {
+	if dias <= 0 {
+		dias = 7
+	}
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return model.ResumoResponse{}, err
+	}
+
+	var resp model.ResumoResponse
+	resp.CNPJEmpresa = cnpj
+	baseSQL := `
+		select
+			count(*)::bigint,
+			count(*) filter (where upper(coalesce(status_operacional, '')) = 'AUTORIZADA')::bigint,
+			0::bigint,
+			count(*) filter (where upper(coalesce(status_operacional, '')) = 'NAO_AUTORIZADA')::bigint,
+			0::bigint,
+			coalesce(sum(total_entrada), 0)::float8,
+			coalesce(sum(case when upper(coalesce(status_operacional, '')) = 'AUTORIZADA' then total_entrada else 0 end), 0)::float8,
+			0::float8,
+			coalesce(sum(case when upper(coalesce(status_operacional, '')) = 'NAO_AUTORIZADA' then total_entrada else 0 end), 0)::float8,
+			0::float8,
+			coalesce(sum(base_icms), 0)::float8,
+			coalesce(sum(valor_icms), 0)::float8,
+			coalesce(sum(valor_pis), 0)::float8,
+			coalesce(sum(valor_cofins), 0)::float8,
+			coalesce(sum(valor_ipi), 0)::float8,
+			coalesce(sum(valor_st), 0)::float8
+		from nfe_entrada_cabecalho_espelho
+		where cnpj_empresa = $1
+	`
+	args := []any{cnpj}
+	argPos := 2
+
+	if strings.TrimSpace(dataInicial) != "" {
+		baseSQL += fmt.Sprintf(" and coalesce(data_emissao, current_date) >= $%d", argPos)
+		args = append(args, dataInicial)
+		argPos++
+	}
+	if strings.TrimSpace(dataFinal) != "" {
+		baseSQL += fmt.Sprintf(" and coalesce(data_emissao, current_date) <= $%d", argPos)
+		args = append(args, dataFinal)
+		argPos++
+	}
+	if strings.TrimSpace(serie) != "" {
+		baseSQL += fmt.Sprintf(" and upper(coalesce(serie_nota, '')) = upper($%d)", argPos)
+		args = append(args, strings.TrimSpace(serie))
+		argPos++
+	}
+	if strings.TrimSpace(nomeComputador) != "" {
+		baseSQL += fmt.Sprintf(" and upper(coalesce(nome_computador, '')) = upper($%d)", argPos)
+		args = append(args, strings.TrimSpace(nomeComputador))
+		argPos++
+	}
+	if strings.TrimSpace(dataInicial) == "" && strings.TrimSpace(dataFinal) == "" {
+		baseSQL += fmt.Sprintf(" and coalesce(data_emissao, current_date) >= current_date - ($%d::int)", argPos)
+		args = append(args, dias)
+	}
+
+	err := p.pool.QueryRow(ctx, baseSQL, args...).Scan(
+		&resp.QuantidadeTotal,
+		&resp.QuantidadeTransmitida,
+		&resp.QuantidadeContingencia,
+		&resp.QuantidadeSemFiscal,
+		&resp.QuantidadeErro,
+		&resp.ValorTotalDocumento,
+		&resp.ValorTotalTransmitido,
+		&resp.ValorTotalContingencia,
+		&resp.ValorTotalSemFiscal,
+		&resp.ValorTotalErro,
+		&resp.ValorBaseICMS,
+		&resp.ValorICMS,
+		&resp.ValorPIS,
+		&resp.ValorCOFINS,
+		&resp.ValorImpostoFederal,
+		&resp.ValorImpostoEstadual,
+	)
+	return resp, err
+}
+
+func (p *Postgres) ListNFeEntrada(ctx context.Context, cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador string, limit int) ([]model.NFCeListItem, error) {
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+
+	baseSQL := `
+		select source_id,
+		       instalacao_id,
+		       coalesce(nome_computador, ''),
+		       case
+		         when upper(coalesce(status_operacional, '')) = 'AUTORIZADA' then 'AUTORIZADA'
+		         else 'NAO_AUTORIZADA'
+		       end as grupo_conferencia,
+		       data_emissao,
+		       '' as hora_venda,
+		       data_entrada,
+		       numero_nota,
+		       case
+		         when trim(coalesce(serie_nota, '')) ~ '^[0-9]+$' then trim(coalesce(serie_nota, ''))::integer
+		         else null
+		       end,
+		       chave_acesso,
+		       '' as protocolo,
+		       status_operacional,
+		       '' as status_erro,
+		       '' as nfce_offline,
+		       '' as nfce_cancelada,
+		       total_entrada,
+		       base_icms,
+		       valor_icms,
+		       valor_pis,
+		       valor_cofins,
+		       valor_ipi,
+		       valor_st,
+		       '' as nome_cliente,
+		       documento_fornecedor
+		from nfe_entrada_cabecalho_espelho
+		where cnpj_empresa = $1
+	`
+	args := []any{cnpj}
+	argPos := 2
+
+	if strings.TrimSpace(status) != "" {
+		status = strings.ToUpper(strings.TrimSpace(status))
+		switch status {
+		case "AUTORIZADA", "NAO_AUTORIZADA":
+			baseSQL += fmt.Sprintf(" and upper(coalesce(status_operacional, '')) = $%d", argPos)
+			args = append(args, status)
+			argPos++
+		}
+	}
+	if strings.TrimSpace(dataInicial) != "" {
+		baseSQL += fmt.Sprintf(" and data_emissao >= $%d", argPos)
+		args = append(args, dataInicial)
+		argPos++
+	}
+	if strings.TrimSpace(dataFinal) != "" {
+		baseSQL += fmt.Sprintf(" and data_emissao <= $%d", argPos)
+		args = append(args, dataFinal)
+		argPos++
+	}
+	if strings.TrimSpace(serie) != "" {
+		baseSQL += fmt.Sprintf(" and upper(coalesce(serie_nota, '')) = upper($%d)", argPos)
+		args = append(args, strings.TrimSpace(serie))
+		argPos++
+	}
+	if strings.TrimSpace(nomeComputador) != "" {
+		baseSQL += fmt.Sprintf(" and upper(coalesce(nome_computador, '')) = upper($%d)", argPos)
+		args = append(args, strings.TrimSpace(nomeComputador))
+		argPos++
+	}
+
+	baseSQL += fmt.Sprintf(" order by coalesce(data_emissao, current_date) desc, source_id desc limit $%d", argPos)
+	args = append(args, limit)
+
+	rows, err := p.pool.Query(ctx, baseSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.NFCeListItem, 0, limit)
+	for rows.Next() {
+		var item model.NFCeListItem
+		var dataVenda *time.Time
+		var dataTransmissao *time.Time
+		var numeroNota string
+		var serieInt *int32
+		var valorDoc *float64
+		var baseICMS *float64
+		var icms *float64
+		var pis *float64
+		var cofins *float64
+		var impostoFederal *float64
+		var impostoEstadual *float64
+		if err := rows.Scan(
+			&item.SourceID,
+			&item.InstalacaoID,
+			&item.NomeComputador,
+			&item.GrupoConferencia,
+			&dataVenda,
+			&item.HoraVenda,
+			&dataTransmissao,
+			&numeroNota,
+			&serieInt,
+			&item.ChaveAcesso,
+			&item.Protocolo,
+			&item.StatusOperacional,
+			&item.StatusErro,
+			&item.NFCeOffline,
+			&item.NFCeCancelada,
+			&valorDoc,
+			&baseICMS,
+			&icms,
+			&pis,
+			&cofins,
+			&impostoFederal,
+			&impostoEstadual,
+			&item.NomeCliente,
+			&item.DocumentoCliente,
+		); err != nil {
+			return nil, err
+		}
+		if dataVenda != nil {
+			v := dataVenda.Format("2006-01-02")
+			item.DataVenda = &v
+		}
+		if dataTransmissao != nil {
+			v := dataTransmissao.Format("2006-01-02")
+			item.DataTransmissao = &v
+		}
+		if numeroNota != "" {
+			if parsed, err := strconv.ParseInt(strings.TrimSpace(numeroNota), 10, 32); err == nil {
+				value := int32(parsed)
+				item.NumeroNFCe = &value
+			}
+		}
+		item.SerieNFCe = serieInt
+		item.ValorDocumento = valorDoc
+		item.BaseICMS = baseICMS
+		item.ICMS = icms
+		item.PIS = pis
+		item.COFINS = cofins
+		item.ImpostoFederal = impostoFederal
+		item.ImpostoEstadual = impostoEstadual
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (p *Postgres) ListNFeEntradaSeries(ctx context.Context, cnpj, token string) ([]model.FiltroValorItem, error) {
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return nil, err
+	}
+
+	rows, err := p.pool.Query(ctx, `
+		select distinct trim(coalesce(serie_nota, ''))
+		from nfe_entrada_cabecalho_espelho
+		where cnpj_empresa = $1
+		  and trim(coalesce(serie_nota, '')) <> ''
+		order by 1
+	`, cnpj)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.FiltroValorItem, 0)
+	for rows.Next() {
+		var item model.FiltroValorItem
+		if err := rows.Scan(&item.Valor); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (p *Postgres) ListNFeEntradaComputadores(ctx context.Context, cnpj, token string) ([]model.FiltroValorItem, error) {
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return nil, err
+	}
+
+	rows, err := p.pool.Query(ctx, `
+		select distinct trim(coalesce(nome_computador, ''))
+		from nfe_entrada_cabecalho_espelho
+		where cnpj_empresa = $1
+		  and trim(coalesce(nome_computador, '')) <> ''
+		order by 1
+	`, cnpj)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.FiltroValorItem, 0)
+	for rows.Next() {
+		var item model.FiltroValorItem
+		if err := rows.Scan(&item.Valor); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func (p *Postgres) saveHeartbeatTx(ctx context.Context, tx pgx.Tx, cnpj, instalacaoID, nomeComputador, remoteIP string) error {
 	_, err := tx.Exec(ctx, `
 		insert into agente_instalacao (
@@ -1050,6 +1406,74 @@ func (p *Postgres) upsertNFeSaidaEspelho(ctx context.Context, tx pgx.Tx, row mod
 		row.ValorST, row.ValorIPI, row.ValorPIS, row.ValorCOFINS, row.ValorPISST, row.ValorCOFINSST,
 		row.Recibo, row.Web, row.TipoPagamento, row.CodigoNumerico, row.DocumentoCliente, row.XMLPresente,
 		row.HashIncremento, row.StatusOperacional, string(row.PayloadJSON), trimRemoteIP(row.RemoteIP))
+	return err
+}
+
+func (p *Postgres) upsertNFeEntradaEspelho(ctx context.Context, tx pgx.Tx, row model.NFeEntradaEspelhoRow) error {
+	_, err := tx.Exec(ctx, `
+		insert into nfe_entrada_cabecalho_espelho (
+			cnpj_empresa, source_id, instalacao_id, nome_computador, id_empresa, data_emissao,
+			data_entrada, tipo_entrada, numero_nota, serie_nota, codigo_modelo, total_entrada,
+			acrescimo, desconto, frete, icms_frete, base_sub_trib, valor_icms_sub, total_produtos,
+			valor_abatimento, valor_seguro, valor_outras_despesas, base_icms, valor_icms, valor_ipi,
+			valor_pis, valor_cofins, valor_pis_st, valor_cofins_st, valor_st, chave_acesso, nome_xml,
+			web, uf_fornecedor, ie_fornecedor, documento_fornecedor, cod_fornecedor, hash_incremento,
+			status_operacional, payload_json, remote_ip, updated_at, created_at
+		) values (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+			$21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+			$31, $32, $33, $34, $35, $36, $37, $38, $39, $40::jsonb,
+			$41, now(), now()
+		)
+		on conflict (cnpj_empresa, source_id) do update set
+			instalacao_id = excluded.instalacao_id,
+			nome_computador = excluded.nome_computador,
+			id_empresa = excluded.id_empresa,
+			data_emissao = excluded.data_emissao,
+			data_entrada = excluded.data_entrada,
+			tipo_entrada = excluded.tipo_entrada,
+			numero_nota = excluded.numero_nota,
+			serie_nota = excluded.serie_nota,
+			codigo_modelo = excluded.codigo_modelo,
+			total_entrada = excluded.total_entrada,
+			acrescimo = excluded.acrescimo,
+			desconto = excluded.desconto,
+			frete = excluded.frete,
+			icms_frete = excluded.icms_frete,
+			base_sub_trib = excluded.base_sub_trib,
+			valor_icms_sub = excluded.valor_icms_sub,
+			total_produtos = excluded.total_produtos,
+			valor_abatimento = excluded.valor_abatimento,
+			valor_seguro = excluded.valor_seguro,
+			valor_outras_despesas = excluded.valor_outras_despesas,
+			base_icms = excluded.base_icms,
+			valor_icms = excluded.valor_icms,
+			valor_ipi = excluded.valor_ipi,
+			valor_pis = excluded.valor_pis,
+			valor_cofins = excluded.valor_cofins,
+			valor_pis_st = excluded.valor_pis_st,
+			valor_cofins_st = excluded.valor_cofins_st,
+			valor_st = excluded.valor_st,
+			chave_acesso = excluded.chave_acesso,
+			nome_xml = excluded.nome_xml,
+			web = excluded.web,
+			uf_fornecedor = excluded.uf_fornecedor,
+			ie_fornecedor = excluded.ie_fornecedor,
+			documento_fornecedor = excluded.documento_fornecedor,
+			cod_fornecedor = excluded.cod_fornecedor,
+			hash_incremento = excluded.hash_incremento,
+			status_operacional = excluded.status_operacional,
+			payload_json = excluded.payload_json,
+			remote_ip = excluded.remote_ip,
+			updated_at = now()
+	`, row.CNPJEmpresa, row.SourceID, row.InstalacaoID, row.NomeComputador, row.IDEmpresa, row.DataEmissao,
+		row.DataEntrada, row.TipoEntrada, row.NumeroNota, row.SerieNota, row.CodigoModelo, row.TotalEntrada,
+		row.Acrescimo, row.Desconto, row.Frete, row.ICMSFrete, row.BaseSubTrib, row.ValorICMSSub, row.TotalProdutos,
+		row.ValorAbatimento, row.ValorSeguro, row.ValorOutrasDespesas, row.BaseICMS, row.ValorICMS, row.ValorIPI,
+		row.ValorPIS, row.ValorCOFINS, row.ValorPISST, row.ValorCOFINSST, row.ValorST, row.ChaveAcesso, row.NomeXML,
+		row.Web, row.UFFornecedor, row.IEFornecedor, row.DocumentoFornecedor, row.CodFornecedor, row.HashIncremento,
+		row.StatusOperacional, string(row.PayloadJSON), trimRemoteIP(row.RemoteIP))
 	return err
 }
 
@@ -1247,6 +1671,100 @@ func buildNFeSaidaEspelhoRow(cnpj, instalacaoID string, rawNota []byte, remoteIP
 		if strings.EqualFold(strings.TrimSpace(row.StatusCancelado), "S") {
 			row.StatusOperacional = "CANCELADA"
 		} else if strings.TrimSpace(row.Protocolo) != "" {
+			row.StatusOperacional = "AUTORIZADA"
+		} else {
+			row.StatusOperacional = "NAO_AUTORIZADA"
+		}
+	}
+
+	return row, nil
+}
+
+func buildNFeEntradaEspelhoRow(cnpj, instalacaoID string, rawNota []byte, remoteIP string) (model.NFeEntradaEspelhoRow, error) {
+	var nota model.NFeEntradaPayload
+	if err := json.Unmarshal(rawNota, &nota); err != nil {
+		return model.NFeEntradaEspelhoRow{}, fmt.Errorf("invalid nfe entrada payload: %w", err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(rawNota, &root); err != nil {
+		return model.NFeEntradaEspelhoRow{}, fmt.Errorf("invalid nfe entrada root payload: %w", err)
+	}
+	ent := nota.Entrada
+	if ent == nil {
+		return model.NFeEntradaEspelhoRow{}, errors.New("nota sem objeto entrada")
+	}
+
+	sourceID, ok := getInt32(ent, "source_id")
+	if !ok || sourceID <= 0 {
+		return model.NFeEntradaEspelhoRow{}, errors.New("source_id is required")
+	}
+
+	row := model.NFeEntradaEspelhoRow{
+		CNPJEmpresa:         cnpj,
+		SourceID:            sourceID,
+		InstalacaoID:        instalacaoID,
+		NomeComputador:      firstNonEmpty(getString(ent, "nome_computador"), getStringMap(root, "nome_computador")),
+		TipoEntrada:         getString(ent, "tipo_entrada"),
+		NumeroNota:          getString(ent, "numero_nota"),
+		SerieNota:           getString(ent, "serie_nota"),
+		ChaveAcesso:         getString(ent, "chave_acesso"),
+		NomeXML:             getString(ent, "nome_xml"),
+		Web:                 getString(ent, "web"),
+		UFFornecedor:        getString(ent, "uf_fornecedor"),
+		IEFornecedor:        getString(ent, "ie_fornecedor"),
+		DocumentoFornecedor: getString(ent, "documento_fornecedor"),
+		PayloadJSON:         rawNota,
+		RemoteIP:            remoteIP,
+	}
+
+	if value, ok := getInt32(ent, "id_empresa"); ok {
+		row.IDEmpresa = &value
+	}
+	if value, ok := getInt32(ent, "codigo_modelo"); ok {
+		row.CodigoModelo = &value
+	}
+	if value, ok := getInt32(ent, "cod_fornecedor"); ok {
+		row.CodFornecedor = &value
+	}
+	if value, ok := getInt32(ent, "hash_incremento"); ok {
+		row.HashIncremento = &value
+	}
+	if value, ok := parseDate(getString(ent, "data_emissao")); ok {
+		row.DataEmissao = &value
+	}
+	if value, ok := parseDate(getString(ent, "data_entrada")); ok {
+		row.DataEntrada = &value
+	}
+
+	for key, target := range map[string]**float64{
+		"total_entrada":         &row.TotalEntrada,
+		"acrescimo":             &row.Acrescimo,
+		"desconto":              &row.Desconto,
+		"frete":                 &row.Frete,
+		"icms_frete":            &row.ICMSFrete,
+		"base_sub_trib":         &row.BaseSubTrib,
+		"valor_icms_sub":        &row.ValorICMSSub,
+		"total_produtos":        &row.TotalProdutos,
+		"valor_abatimento":      &row.ValorAbatimento,
+		"valor_seguro":          &row.ValorSeguro,
+		"valor_outras_despesas": &row.ValorOutrasDespesas,
+		"base_icms":             &row.BaseICMS,
+		"valor_icms":            &row.ValorICMS,
+		"valor_ipi":             &row.ValorIPI,
+		"valor_pis":             &row.ValorPIS,
+		"valor_cofins":          &row.ValorCOFINS,
+		"valor_pis_st":          &row.ValorPISST,
+		"valor_cofins_st":       &row.ValorCOFINSST,
+		"valor_st":              &row.ValorST,
+	} {
+		if value, ok := getFloat64(ent, key); ok {
+			*target = &value
+		}
+	}
+
+	row.StatusOperacional = strings.ToUpper(strings.TrimSpace(nota.StatusOperacional))
+	if row.StatusOperacional == "" {
+		if strings.TrimSpace(row.ChaveAcesso) != "" || strings.TrimSpace(row.NomeXML) != "" {
 			row.StatusOperacional = "AUTORIZADA"
 		} else {
 			row.StatusOperacional = "NAO_AUTORIZADA"

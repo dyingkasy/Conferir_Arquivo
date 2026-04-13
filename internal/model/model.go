@@ -189,6 +189,56 @@ type NFeSaidaEspelhoRow struct {
 	RemoteIP          string
 }
 
+type NFeEntradaPayload struct {
+	Empresa           map[string]any `json:"empresa"`
+	Entrada           map[string]any `json:"entrada"`
+	StatusOperacional string         `json:"status_operacional"`
+}
+
+type NFeEntradaEspelhoRow struct {
+	CNPJEmpresa          string
+	SourceID             int32
+	InstalacaoID         string
+	NomeComputador       string
+	IDEmpresa            *int32
+	DataEmissao          *time.Time
+	DataEntrada          *time.Time
+	TipoEntrada          string
+	NumeroNota           string
+	SerieNota            string
+	CodigoModelo         *int32
+	TotalEntrada         *float64
+	Acrescimo            *float64
+	Desconto             *float64
+	Frete                *float64
+	ICMSFrete            *float64
+	BaseSubTrib          *float64
+	ValorICMSSub         *float64
+	TotalProdutos        *float64
+	ValorAbatimento      *float64
+	ValorSeguro          *float64
+	ValorOutrasDespesas  *float64
+	BaseICMS             *float64
+	ValorICMS            *float64
+	ValorIPI             *float64
+	ValorPIS             *float64
+	ValorCOFINS          *float64
+	ValorPISST           *float64
+	ValorCOFINSST        *float64
+	ValorST              *float64
+	ChaveAcesso          string
+	NomeXML              string
+	Web                  string
+	UFFornecedor         string
+	IEFornecedor         string
+	DocumentoFornecedor  string
+	CodFornecedor        *int32
+	HashIncremento       *int32
+	StatusOperacional    string
+	PayloadJSON          []byte
+	RemoteIP             string
+}
+
 func NormalizeDigits(value string) string {
 	var b strings.Builder
 	b.Grow(len(value))

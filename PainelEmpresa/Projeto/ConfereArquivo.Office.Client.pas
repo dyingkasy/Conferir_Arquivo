@@ -105,6 +105,8 @@ function TConfereOfficeClient.DocApiBase(const ADocType: string): string;
 begin
   if NormalizeDocType(ADocType) = 'NFE_SAIDA' then
     Result := '/api/v1/nfe-saida'
+  else if NormalizeDocType(ADocType) = 'NFE_ENTRADA' then
+    Result := '/api/v1/nfe-entrada'
   else
     Result := '/api/v1/nfce';
 end;
@@ -193,7 +195,7 @@ var
   Item: TConfereFiltroValor;
   List: TList<TConfereFiltroValor>;
 begin
-  if NormalizeDocType(ADocType) = 'NFE_SAIDA' then
+  if (NormalizeDocType(ADocType) = 'NFE_SAIDA') or (NormalizeDocType(ADocType) = 'NFE_ENTRADA') then
     Raw := GetJson(BuildUrl(DocApiBase(ADocType) + '/series?cnpj_empresa=' + ACNPJ))
   else
     Raw := GetJson(BuildUrl(DocApiBase(ADocType) + '/series?cnpj_empresa=' + ACNPJ));
@@ -267,6 +269,8 @@ begin
   begin
     if NormalizeDocType(ADocType) = 'NFE_SAIDA' then
       Url := Url + '&serie_nota_fiscal=' + ASerie
+    else if NormalizeDocType(ADocType) = 'NFE_ENTRADA' then
+      Url := Url + '&serie_nota=' + ASerie
     else
       Url := Url + '&serie_nfce=' + ASerie;
   end;
@@ -321,6 +325,8 @@ begin
   begin
     if NormalizeDocType(ADocType) = 'NFE_SAIDA' then
       Url := Url + '&serie_nota_fiscal=' + ASerie
+    else if NormalizeDocType(ADocType) = 'NFE_ENTRADA' then
+      Url := Url + '&serie_nota=' + ASerie
     else
       Url := Url + '&serie_nfce=' + ASerie;
   end;
