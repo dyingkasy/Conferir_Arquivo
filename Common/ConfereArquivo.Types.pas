@@ -83,6 +83,11 @@ type
   TConfereNFeEntradaRecord = record
     SourceID: Integer;
     IDEmpresa: Integer;
+    EmpresaCNPJ: string;
+    EmpresaRazaoSocial: string;
+    EmpresaNomeFantasia: string;
+    EmpresaInscricaoEstadual: string;
+    EmpresaCRT: string;
     DataEmissao: TDateTime;
     DataEntrada: TDateTime;
     TipoEntrada: string;

@@ -149,16 +149,42 @@ end;
 
 function BuildNFeEntradaJson(const AEmpresa: TConfereEmpresaInfo;
   const ARecord: TConfereNFeEntradaRecord): TJSONObject;
+var
+  EmpresaCNPJ: string;
+  EmpresaRazaoSocial: string;
+  EmpresaNomeFantasia: string;
+  EmpresaInscricaoEstadual: string;
+  EmpresaCRT: string;
 begin
+  EmpresaCNPJ := ARecord.EmpresaCNPJ;
+  if EmpresaCNPJ = '' then
+    EmpresaCNPJ := AEmpresa.CNPJ;
+
+  EmpresaRazaoSocial := ARecord.EmpresaRazaoSocial;
+  if EmpresaRazaoSocial = '' then
+    EmpresaRazaoSocial := AEmpresa.RazaoSocial;
+
+  EmpresaNomeFantasia := ARecord.EmpresaNomeFantasia;
+  if EmpresaNomeFantasia = '' then
+    EmpresaNomeFantasia := AEmpresa.NomeFantasia;
+
+  EmpresaInscricaoEstadual := ARecord.EmpresaInscricaoEstadual;
+  if EmpresaInscricaoEstadual = '' then
+    EmpresaInscricaoEstadual := AEmpresa.InscricaoEstadual;
+
+  EmpresaCRT := ARecord.EmpresaCRT;
+  if EmpresaCRT = '' then
+    EmpresaCRT := AEmpresa.CRT;
+
   Result := TJSONObject.Create;
   Result.AddPair('payload_version', TJSONNumber.Create(1));
   Result.AddPair('empresa', TJSONObject.Create
     .AddPair('id_empresa_erp', TJSONNumber.Create(ARecord.IDEmpresa))
-    .AddPair('cnpj', NormalizeDigits(AEmpresa.CNPJ))
-    .AddPair('razao_social', AEmpresa.RazaoSocial)
-    .AddPair('nome_fantasia', AEmpresa.NomeFantasia)
-    .AddPair('inscricao_estadual', NormalizeDigits(AEmpresa.InscricaoEstadual))
-    .AddPair('crt', AEmpresa.CRT)
+    .AddPair('cnpj', NormalizeDigits(EmpresaCNPJ))
+    .AddPair('razao_social', EmpresaRazaoSocial)
+    .AddPair('nome_fantasia', EmpresaNomeFantasia)
+    .AddPair('inscricao_estadual', NormalizeDigits(EmpresaInscricaoEstadual))
+    .AddPair('crt', EmpresaCRT)
     .AddPair('tipo_regime', AEmpresa.TipoRegime)
     .AddPair('cidade', AEmpresa.Cidade)
     .AddPair('uf', AEmpresa.UF)

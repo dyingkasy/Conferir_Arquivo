@@ -263,11 +263,13 @@ begin
     EnsureConnected;
     Q.Connection := FConnection;
     Q.SQL.Text :=
-      'select e.cod_ent, e.cod_emp, e.dataemi_ent, e.dataent_ent, e.tipo_ent, e.numnf_ent, e.serie_ent, e.cod_modelo, ' +
+      'select e.cod_ent, e.cod_emp, emp.cnpj_emp, emp.razao_emp, emp.fantasia_emp, emp.insc_emp, emp.regime, ' +
+      'e.dataemi_ent, e.dataent_ent, e.tipo_ent, e.numnf_ent, e.serie_ent, e.cod_modelo, ' +
       'e.total_ent, e.acres_ent, e.desc_ent, e.frete_ent, e.icmsfrete_ent, e.base_sub_trib, e.valor_icms_sub, ' +
       'e.total_produtos, e.vl_abat_nt, e.vl_seg, e.vl_out_da, e.vl_bc_icms, e.vl_icms, e.vl_ipi, e.vl_pis, e.vl_cofins, ' +
       'e.vl_pis_st, e.vl_cofins_st, e.vl_st, e.chv_nfe, e.nome_xml, e.web, e.uf, e.ie, e.cnpj, e.cod_for ' +
       'from entradas e ' +
+      'join empresa emp on emp.cod_emp = e.cod_emp ' +
       'where ((e.cod_ent > :last_id) or (e.dataemi_ent >= :window_date)) ' +
       'order by e.cod_ent';
     Q.ParamByName('last_id').AsInteger := ALastID;
@@ -278,6 +280,11 @@ begin
       FillChar(Item, SizeOf(Item), 0);
       Item.SourceID := IntFieldValue(Q.FieldByName('COD_ENT'));
       Item.IDEmpresa := IntFieldValue(Q.FieldByName('COD_EMP'));
+      Item.EmpresaCNPJ := Trim(Q.FieldByName('CNPJ_EMP').AsString);
+      Item.EmpresaRazaoSocial := Trim(Q.FieldByName('RAZAO_EMP').AsString);
+      Item.EmpresaNomeFantasia := Trim(Q.FieldByName('FANTASIA_EMP').AsString);
+      Item.EmpresaInscricaoEstadual := Trim(Q.FieldByName('INSC_EMP').AsString);
+      Item.EmpresaCRT := Trim(Q.FieldByName('REGIME').AsString);
       Item.DataEmissao := DateFieldValue(Q.FieldByName('DATAEMI_ENT'));
       Item.DataEntrada := DateFieldValue(Q.FieldByName('DATAENT_ENT'));
       Item.TipoEntrada := Trim(Q.FieldByName('TIPO_ENT').AsString);
@@ -312,8 +319,8 @@ begin
       Item.CodFornecedor := IntFieldValue(Q.FieldByName('COD_FOR'));
 
       Item.StatusOperacional := ConfereNFeEntradaStatusFromRecord(Item);
-      HashBase := Format('%d|%s|%s|%s|%s|%s|%s|%s|%s|%s',
-        [Item.SourceID, Item.NumeroNota, Item.SerieNota, Item.ChaveAcesso, Item.NomeXML,
+      HashBase := Format('%d|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s',
+        [Item.SourceID, Item.IDEmpresa, Item.EmpresaCNPJ, Item.NumeroNota, Item.SerieNota, Item.ChaveAcesso, Item.NomeXML,
          FormatDateTime('yyyy-mm-dd', Item.DataEmissao), FormatFloat('0.00', Item.TotalEntrada),
          FormatFloat('0.00', Item.BaseICMS), FormatFloat('0.00', Item.ValorICMS), Item.DocumentoFornecedor]);
       Item.HashIncremento := CalcHashIncremento(HashBase);
