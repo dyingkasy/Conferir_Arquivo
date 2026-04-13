@@ -15,6 +15,8 @@ type
     gbOrigem: TGroupBox;
     lblBancoNFCe: TLabel;
     lblBancoNFeSaida: TLabel;
+    chkAtivarNFCe: TCheckBox;
+    chkAtivarNFeSaida: TCheckBox;
     lblUsuario: TLabel;
     lblSenha: TLabel;
     mmBancosNFCe: TMemo;
@@ -127,7 +129,9 @@ begin
   RecreateEngine;
   AddTrayIcon;
   AppendEvent('Agente carregado.');
-  if FConfig.Enabled then
+  if FConfig.FirstRunPending then
+    AppendEvent('Primeira abertura detectada. A sincronizacao automatica permanece parada ate voce salvar a configuracao ou executar um Sync Total.')
+  else if FConfig.Enabled then
     StartAutomaticSync;
 
   StartHidden := FindCmdLineSwitch('tray', ['-', '/'], True);
@@ -308,6 +312,8 @@ begin
   mmBancosNFeSaida.Clear;
   for DatabasePath in FConfig.NFeSaidaDatabasePaths do
     mmBancosNFeSaida.Lines.Add(DatabasePath);
+  chkAtivarNFCe.Checked := FConfig.EnabledNFCe;
+  chkAtivarNFeSaida.Checked := FConfig.EnabledNFeSaida;
   edUsuario.Text := FConfig.FirebirdUser;
   edSenha.Text := FConfig.FirebirdPassword;
   edApiUrl.Text := FConfig.ApiBaseUrl;
@@ -328,6 +334,8 @@ procedure TFrmConfereArquivoAgentMain.SaveScreenToConfig;
 begin
   FConfig.NFCeDatabasePaths := ParseMemoPaths(mmBancosNFCe);
   FConfig.NFeSaidaDatabasePaths := ParseMemoPaths(mmBancosNFeSaida);
+  FConfig.EnabledNFCe := chkAtivarNFCe.Checked;
+  FConfig.EnabledNFeSaida := chkAtivarNFeSaida.Checked;
   if Length(FConfig.NFCeDatabasePaths) > 0 then
     FConfig.NFCeDatabasePath := FConfig.NFCeDatabasePaths[0]
   else
@@ -350,6 +358,7 @@ begin
   if FConfig.WindowDays <= 0 then
     FConfig.WindowDays := 3;
   FConfig.Enabled := chkAtivo.Checked;
+  FConfig.FirstRunPending := False;
   FConfig.StartWithWindows := chkIniciarWindows.Checked;
   SaveAgentConfig(FConfig);
 end;
@@ -432,6 +441,7 @@ begin
   tmrAgente.Interval := FConfig.IntervalSeconds * 1000;
   tmrAgente.Enabled := True;
   FConfig.Enabled := True;
+  FConfig.FirstRunPending := False;
   chkAtivo.Checked := True;
   SaveAgentConfig(FConfig);
   ScheduleNextSync;

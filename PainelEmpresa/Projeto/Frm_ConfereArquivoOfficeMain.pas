@@ -29,12 +29,14 @@ type
     lblQtdEmpresas: TLabel;
     pnlConteudo: TPanel;
     gbFiltros: TGroupBox;
+    lblDocumento: TLabel;
     lblStatus: TLabel;
     lblDataInicial: TLabel;
     lblDataFinal: TLabel;
     lblSerie: TLabel;
     lblComputador: TLabel;
     cbStatus: TComboBox;
+    cbDocumento: TComboBox;
     cbSerie: TComboBox;
     cbComputador: TComboBox;
     dtDataInicial: TDateTimePicker;
@@ -83,12 +85,15 @@ type
     procedure btnEmpresasClick(Sender: TObject);
     procedure edEmpresaFiltroChange(Sender: TObject);
     procedure lbEmpresasClick(Sender: TObject);
+    procedure cbDocumentoChange(Sender: TObject);
     procedure sgNotasDrawCell(Sender: TObject; ACol, ARow: Integer; Rect: TRect;
       State: TGridDrawState);
   private
     FConfig: TConfereOfficeConfig;
     FEmpresas: TArray<TConfereEmpresaDisponivel>;
     FVisibleEmpresas: TArray<Integer>;
+    function CurrentDocType: string;
+    function IsNFeSaida: Boolean;
     function FriendlyStatus(const AGrupo, AStatus: string): string;
     procedure ApplyVisualStyle;
     procedure StyleReadOnlyEdit(AEdit: TEdit; const AColor: TColor);
@@ -100,6 +105,7 @@ type
     procedure LoadEmpresas;
     procedure ApplyCompanyFilter;
     function GetSelectedEmpresaIndex: Integer;
+    procedure UpdateDocumentMode;
     procedure LoadFiltroOpcoes;
     procedure LoadResumo;
     procedure LoadLista;
@@ -204,8 +210,11 @@ procedure TFrmConfereArquivoOfficeMain.LoadScreen;
 begin
   edApi.Text := FConfig.ApiBaseUrl;
   edToken.Text := FConfig.ApiToken;
-  cbStatus.Items.Text := 'TODOS'#13#10'TRANSMITIDA'#13#10'CONTINGENCIA'#13#10'ERRO'#13#10'SEM_FISCAL';
-  cbStatus.ItemIndex := 0;
+  cbDocumento.Items.Text := 'NFC-e'#13#10'NFe Saida';
+  if FConfig.DocumentoTipo = 'NFE_SAIDA' then
+    cbDocumento.ItemIndex := 1
+  else
+    cbDocumento.ItemIndex := 0;
   cbSerie.Items.Text := 'TODAS';
   cbSerie.ItemIndex := 0;
   cbComputador.Items.Text := 'TODOS';
@@ -213,6 +222,7 @@ begin
   dtDataInicial.Date := StartOfTheMonth(Date);
   dtDataFinal.Date := Date;
   edEmpresaFiltro.Text := '';
+  UpdateDocumentMode;
 end;
 
 procedure TFrmConfereArquivoOfficeMain.SaveScreen;
@@ -221,6 +231,7 @@ var
 begin
   FConfig.ApiBaseUrl := Trim(edApi.Text);
   FConfig.ApiToken := Trim(edToken.Text);
+  FConfig.DocumentoTipo := CurrentDocType;
   EmpresaIdx := GetSelectedEmpresaIndex;
   if (EmpresaIdx >= 0) and (EmpresaIdx < Length(FEmpresas)) then
     FConfig.CNPJEmpresa := FEmpresas[EmpresaIdx].CNPJ;
@@ -236,8 +247,14 @@ begin
   sgNotas.Cells[1,0] := 'Hora';
   sgNotas.Cells[2,0] := 'Grupo';
   sgNotas.Cells[3,0] := 'Status Final';
-  sgNotas.Cells[4,0] := 'Transm.';
-  sgNotas.Cells[5,0] := 'Numero';
+  if IsNFeSaida then
+    sgNotas.Cells[4,0] := 'Saida'
+  else
+    sgNotas.Cells[4,0] := 'Transm.';
+  if IsNFeSaida then
+    sgNotas.Cells[5,0] := 'Nota'
+  else
+    sgNotas.Cells[5,0] := 'Numero';
   sgNotas.Cells[6,0] := 'Serie';
   sgNotas.Cells[7,0] := 'Valor';
   sgNotas.Cells[8,0] := 'ICMS';
@@ -260,6 +277,57 @@ begin
   sgNotas.ColWidths[11] := 130;
   sgNotas.ColWidths[12] := 180;
   sgNotas.ColWidths[13] := 148;
+end;
+
+function TFrmConfereArquivoOfficeMain.CurrentDocType: string;
+begin
+  if cbDocumento.ItemIndex = 1 then
+    Result := 'NFE_SAIDA'
+  else
+    Result := 'NFCE';
+end;
+
+function TFrmConfereArquivoOfficeMain.IsNFeSaida: Boolean;
+begin
+  Result := CurrentDocType = 'NFE_SAIDA';
+end;
+
+procedure TFrmConfereArquivoOfficeMain.UpdateDocumentMode;
+begin
+  cbStatus.Items.BeginUpdate;
+  try
+    cbStatus.Items.Clear;
+    if IsNFeSaida then
+    begin
+      cbStatus.Items.Text := 'TODOS'#13#10'AUTORIZADA'#13#10'CANCELADA'#13#10'NAO_AUTORIZADA';
+      lblSubtitulo.Caption := 'Consulta atual: NFe Saida. NFC-e e NFe Saida ficam separadas por tipo de documento.';
+      lblTransmitidas.Caption := 'Autorizadas';
+      lblContingencia.Caption := 'Canceladas';
+      lblSemFiscal.Caption := 'Nao autorizadas';
+      lblErro.Caption := 'Nao usado';
+      lblValorTransmitido.Caption := 'Valor autorizadas';
+      lblValorCont.Caption := 'Valor canceladas';
+      lblValorSemFiscal.Caption := 'Valor nao autoriz.';
+      lblValorErro.Caption := 'Valor nao usado';
+    end
+    else
+    begin
+      cbStatus.Items.Text := 'TODOS'#13#10'TRANSMITIDA'#13#10'CONTINGENCIA'#13#10'ERRO'#13#10'SEM_FISCAL';
+      lblSubtitulo.Caption := 'Consulta atual: NFC-e e NFe Saida separadas por tipo de documento.';
+      lblTransmitidas.Caption := 'Transmitidas';
+      lblContingencia.Caption := 'Contingencia';
+      lblSemFiscal.Caption := 'Sem fiscal';
+      lblErro.Caption := 'Erro';
+      lblValorTransmitido.Caption := 'Valor transmitido';
+      lblValorCont.Caption := 'Valor contingencia';
+      lblValorSemFiscal.Caption := 'Valor sem fiscal';
+      lblValorErro.Caption := 'Valor erro';
+    end;
+    cbStatus.ItemIndex := 0;
+  finally
+    cbStatus.Items.EndUpdate;
+  end;
+  ApplyGridHeader;
 end;
 
 function TFrmConfereArquivoOfficeMain.FriendlyStatus(const AGrupo,
@@ -328,10 +396,10 @@ begin
     if Trim(FConfig.CNPJEmpresa) = '' then
       Exit;
 
-    Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
-    try
-      Series := Client.LoadSeries(FConfig.CNPJEmpresa);
-      Computadores := Client.LoadComputadores(FConfig.CNPJEmpresa);
+  Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
+  try
+    Series := Client.LoadSeries(CurrentDocType, FConfig.CNPJEmpresa);
+    Computadores := Client.LoadComputadores(CurrentDocType, FConfig.CNPJEmpresa);
     finally
       Client.Free;
     end;
@@ -414,6 +482,7 @@ begin
   Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
   try
     Resumo := Client.LoadResumo(
+      CurrentDocType,
       FConfig.CNPJEmpresa,
       FormatDateTime('yyyy-mm-dd', dtDataInicial.Date),
       FormatDateTime('yyyy-mm-dd', dtDataFinal.Date),
@@ -464,6 +533,7 @@ begin
     else
       ComputadorFiltro := '';
     Items := Client.LoadLista(
+      CurrentDocType,
       FConfig.CNPJEmpresa,
       StatusValue,
       FormatDateTime('yyyy-mm-dd', dtDataInicial.Date),
@@ -528,6 +598,12 @@ begin
     Client.Free;
   end;
   LoadEmpresas;
+end;
+
+procedure TFrmConfereArquivoOfficeMain.cbDocumentoChange(Sender: TObject);
+begin
+  UpdateDocumentMode;
+  LoadFiltroOpcoes;
 end;
 
 procedure TFrmConfereArquivoOfficeMain.edEmpresaFiltroChange(Sender: TObject);

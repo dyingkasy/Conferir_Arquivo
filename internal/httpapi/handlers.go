@@ -277,6 +277,99 @@ func (h *Handler) Computadores(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) NFeSaidaResumo(w http.ResponseWriter, r *http.Request) {
+	token := auth.BearerToken(r.Header.Get("Authorization"))
+	cnpj := model.NormalizeDigits(r.URL.Query().Get("cnpj_empresa"))
+	dataInicial := strings.TrimSpace(r.URL.Query().Get("data_inicial"))
+	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
+	serie := strings.TrimSpace(r.URL.Query().Get("serie_nota_fiscal"))
+	nomeComputador := strings.TrimSpace(r.URL.Query().Get("nome_computador"))
+	dias := 7
+	if value := strings.TrimSpace(r.URL.Query().Get("dias")); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			dias = parsed
+		}
+	}
+	if cnpj == "" || token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
+		return
+	}
+	resp, err := h.store.GetNFeSaidaResumo(r.Context(), cnpj, token, dataInicial, dataFinal, serie, nomeComputador, dias)
+	if err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) NFeSaidaLista(w http.ResponseWriter, r *http.Request) {
+	token := auth.BearerToken(r.Header.Get("Authorization"))
+	cnpj := model.NormalizeDigits(r.URL.Query().Get("cnpj_empresa"))
+	status := strings.TrimSpace(r.URL.Query().Get("status_operacional"))
+	dataInicial := strings.TrimSpace(r.URL.Query().Get("data_inicial"))
+	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
+	serie := strings.TrimSpace(r.URL.Query().Get("serie_nota_fiscal"))
+	nomeComputador := strings.TrimSpace(r.URL.Query().Get("nome_computador"))
+	limit := 200
+	if value := strings.TrimSpace(r.URL.Query().Get("limit")); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			limit = parsed
+		}
+	}
+	if cnpj == "" || token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
+		return
+	}
+	items, err := h.store.ListNFeSaida(r.Context(), cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, limit)
+	if err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "ok",
+		"quantidade": len(items),
+		"items":      items,
+	})
+}
+
+func (h *Handler) NFeSaidaSeries(w http.ResponseWriter, r *http.Request) {
+	token := auth.BearerToken(r.Header.Get("Authorization"))
+	cnpj := model.NormalizeDigits(r.URL.Query().Get("cnpj_empresa"))
+	if cnpj == "" || token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
+		return
+	}
+	items, err := h.store.ListNFeSaidaSeries(r.Context(), cnpj, token)
+	if err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "ok",
+		"quantidade": len(items),
+		"items":      items,
+	})
+}
+
+func (h *Handler) NFeSaidaComputadores(w http.ResponseWriter, r *http.Request) {
+	token := auth.BearerToken(r.Header.Get("Authorization"))
+	cnpj := model.NormalizeDigits(r.URL.Query().Get("cnpj_empresa"))
+	if cnpj == "" || token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
+		return
+	}
+	items, err := h.store.ListNFeSaidaComputadores(r.Context(), cnpj, token)
+	if err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "ok",
+		"quantidade": len(items),
+		"items":      items,
+	})
+}
+
 func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 	if errors.Is(err, store.ErrUnauthorized) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{

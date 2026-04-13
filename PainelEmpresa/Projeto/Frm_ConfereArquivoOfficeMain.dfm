@@ -191,11 +191,18 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
       Caption = 'Filtros'
       TabOrder = 0
       object lblStatus: TLabel
-        Left = 12
+        Left = 164
         Top = 23
         Width = 33
         Height = 15
         Caption = 'Status'
+      end
+      object lblDocumento: TLabel
+        Left = 12
+        Top = 23
+        Width = 66
+        Height = 15
+        Caption = 'Documento'
       end
       object lblDataInicial: TLabel
         Left = 238
@@ -226,25 +233,24 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Caption = 'Computador'
       end
       object cbStatus: TComboBox
+        Left = 164
+        Top = 40
+        Width = 160
+        Height = 23
+        Style = csDropDownList
+        TabOrder = 1
+      end
+      object cbDocumento: TComboBox
         Left = 12
         Top = 40
-        Width = 210
+        Width = 136
         Height = 23
         Style = csDropDownList
         TabOrder = 0
+        OnChange = cbDocumentoChange
       end
       object dtDataInicial: TDateTimePicker
-        Left = 238
-        Top = 40
-        Width = 96
-        Height = 23
-        Date = 46022.000000000000000000
-        Time = 0.000000000000000000
-        Kind = dtkDate
-        TabOrder = 1
-      end
-      object dtDataFinal: TDateTimePicker
-        Left = 352
+        Left = 340
         Top = 40
         Width = 96
         Height = 23
@@ -253,29 +259,39 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Kind = dtkDate
         TabOrder = 2
       end
-      object cbSerie: TComboBox
-        Left = 466
+      object dtDataFinal: TDateTimePicker
+        Left = 454
         Top = 40
-        Width = 128
+        Width = 96
         Height = 23
-        Style = csDropDownList
+        Date = 46022.000000000000000000
+        Time = 0.000000000000000000
+        Kind = dtkDate
         TabOrder = 3
       end
-      object cbComputador: TComboBox
-        Left = 612
+      object cbSerie: TComboBox
+        Left = 566
         Top = 40
-        Width = 180
+        Width = 112
         Height = 23
         Style = csDropDownList
         TabOrder = 4
       end
-      object btnConsultar: TButton
-        Left = 808
-        Top = 37
-        Width = 116
-        Height = 28
-        Caption = 'Consultar Agora'
+      object cbComputador: TComboBox
+        Left = 694
+        Top = 40
+        Width = 150
+        Height = 23
+        Style = csDropDownList
         TabOrder = 5
+      end
+      object btnConsultar: TButton
+        Left = 856
+        Top = 37
+        Width = 68
+        Height = 28
+        Caption = 'Consultar'
+        TabOrder = 6
         OnClick = btnConsultarClick
       end
     end

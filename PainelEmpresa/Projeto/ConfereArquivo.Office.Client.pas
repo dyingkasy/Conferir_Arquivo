@@ -67,6 +67,8 @@ type
   private
     FBaseUrl: string;
     FToken: string;
+    function NormalizeDocType(const ADocType: string): string;
+    function DocApiBase(const ADocType: string): string;
     function BuildUrl(const APath: string): string;
     function GetJson(const AUrl: string): string;
     function JsonToCurrency(const AValue: string): Currency;
@@ -74,10 +76,10 @@ type
     constructor Create(const ABaseUrl, AToken: string);
     function Health: string;
     function LoadEmpresas: TArray<TConfereEmpresaDisponivel>;
-    function LoadSeries(const ACNPJ: string): TArray<TConfereFiltroValor>;
-    function LoadComputadores(const ACNPJ: string): TArray<TConfereFiltroValor>;
-    function LoadResumo(const ACNPJ, ADataInicial, ADataFinal, ASerie, ANomeComputador: string; ADias: Integer): TConfereResumo;
-    function LoadLista(const ACNPJ, AStatus, ADataInicial, ADataFinal, ASerie, ANomeComputador: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
+    function LoadSeries(const ADocType, ACNPJ: string): TArray<TConfereFiltroValor>;
+    function LoadComputadores(const ADocType, ACNPJ: string): TArray<TConfereFiltroValor>;
+    function LoadResumo(const ADocType, ACNPJ, ADataInicial, ADataFinal, ASerie, ANomeComputador: string; ADias: Integer): TConfereResumo;
+    function LoadLista(const ADocType, ACNPJ, AStatus, ADataInicial, ADataFinal, ASerie, ANomeComputador: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
   end;
 
 implementation
@@ -90,6 +92,21 @@ begin
   inherited Create;
   FBaseUrl := Trim(ABaseUrl);
   FToken := Trim(AToken);
+end;
+
+function TConfereOfficeClient.NormalizeDocType(const ADocType: string): string;
+begin
+  Result := UpperCase(Trim(ADocType));
+  if Result = '' then
+    Result := 'NFCE';
+end;
+
+function TConfereOfficeClient.DocApiBase(const ADocType: string): string;
+begin
+  if NormalizeDocType(ADocType) = 'NFE_SAIDA' then
+    Result := '/api/v1/nfe-saida'
+  else
+    Result := '/api/v1/nfce';
 end;
 
 function TConfereOfficeClient.BuildUrl(const APath: string): string;
@@ -166,7 +183,7 @@ begin
   end;
 end;
 
-function TConfereOfficeClient.LoadSeries(const ACNPJ: string): TArray<TConfereFiltroValor>;
+function TConfereOfficeClient.LoadSeries(const ADocType, ACNPJ: string): TArray<TConfereFiltroValor>;
 var
   Raw: string;
   Json: TJSONObject;
@@ -176,7 +193,10 @@ var
   Item: TConfereFiltroValor;
   List: TList<TConfereFiltroValor>;
 begin
-  Raw := GetJson(BuildUrl('/api/v1/nfce/series?cnpj_empresa=' + ACNPJ));
+  if NormalizeDocType(ADocType) = 'NFE_SAIDA' then
+    Raw := GetJson(BuildUrl(DocApiBase(ADocType) + '/series?cnpj_empresa=' + ACNPJ))
+  else
+    Raw := GetJson(BuildUrl(DocApiBase(ADocType) + '/series?cnpj_empresa=' + ACNPJ));
   Json := TJSONObject.ParseJSONValue(Raw) as TJSONObject;
   List := TList<TConfereFiltroValor>.Create;
   try
@@ -198,7 +218,7 @@ begin
   end;
 end;
 
-function TConfereOfficeClient.LoadComputadores(const ACNPJ: string): TArray<TConfereFiltroValor>;
+function TConfereOfficeClient.LoadComputadores(const ADocType, ACNPJ: string): TArray<TConfereFiltroValor>;
 var
   Raw: string;
   Json: TJSONObject;
@@ -208,7 +228,7 @@ var
   Item: TConfereFiltroValor;
   List: TList<TConfereFiltroValor>;
 begin
-  Raw := GetJson(BuildUrl('/api/v1/nfce/computadores?cnpj_empresa=' + ACNPJ));
+  Raw := GetJson(BuildUrl(DocApiBase(ADocType) + '/computadores?cnpj_empresa=' + ACNPJ));
   Json := TJSONObject.ParseJSONValue(Raw) as TJSONObject;
   List := TList<TConfereFiltroValor>.Create;
   try
@@ -230,7 +250,7 @@ begin
   end;
 end;
 
-function TConfereOfficeClient.LoadResumo(const ACNPJ, ADataInicial, ADataFinal,
+function TConfereOfficeClient.LoadResumo(const ADocType, ACNPJ, ADataInicial, ADataFinal,
   ASerie, ANomeComputador: string; ADias: Integer): TConfereResumo;
 var
   Json: TJSONObject;
@@ -238,13 +258,18 @@ var
   Url: string;
 begin
   FillChar(Result, SizeOf(Result), 0);
-  Url := '/api/v1/nfce/resumo?cnpj_empresa=' + ACNPJ;
+  Url := DocApiBase(ADocType) + '/resumo?cnpj_empresa=' + ACNPJ;
   if (Trim(ADataInicial) <> '') and (Trim(ADataFinal) <> '') then
     Url := Url + '&data_inicial=' + ADataInicial + '&data_final=' + ADataFinal
   else
     Url := Url + '&dias=' + IntToStr(ADias);
   if Trim(ASerie) <> '' then
-    Url := Url + '&serie_nfce=' + ASerie;
+  begin
+    if NormalizeDocType(ADocType) = 'NFE_SAIDA' then
+      Url := Url + '&serie_nota_fiscal=' + ASerie
+    else
+      Url := Url + '&serie_nfce=' + ASerie;
+  end;
   if Trim(ANomeComputador) <> '' then
     Url := Url + '&nome_computador=' + TNetEncoding.URL.Encode(ANomeComputador);
 
@@ -274,7 +299,7 @@ begin
   end;
 end;
 
-function TConfereOfficeClient.LoadLista(const ACNPJ, AStatus, ADataInicial,
+function TConfereOfficeClient.LoadLista(const ADocType, ACNPJ, AStatus, ADataInicial,
   ADataFinal, ASerie, ANomeComputador: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
 var
   Url, Raw: string;
@@ -285,7 +310,7 @@ var
   Item: TConfereNotaConsulta;
   List: TList<TConfereNotaConsulta>;
 begin
-  Url := '/api/v1/nfce/lista?cnpj_empresa=' + ACNPJ + '&limit=' + IntToStr(ALimit);
+  Url := DocApiBase(ADocType) + '/lista?cnpj_empresa=' + ACNPJ + '&limit=' + IntToStr(ALimit);
   if Trim(AStatus) <> '' then
     Url := Url + '&status_operacional=' + AStatus;
   if Trim(ADataInicial) <> '' then
@@ -293,7 +318,12 @@ begin
   if Trim(ADataFinal) <> '' then
     Url := Url + '&data_final=' + ADataFinal;
   if Trim(ASerie) <> '' then
-    Url := Url + '&serie_nfce=' + ASerie;
+  begin
+    if NormalizeDocType(ADocType) = 'NFE_SAIDA' then
+      Url := Url + '&serie_nota_fiscal=' + ASerie
+    else
+      Url := Url + '&serie_nfce=' + ASerie;
+  end;
   if Trim(ANomeComputador) <> '' then
     Url := Url + '&nome_computador=' + TNetEncoding.URL.Encode(ANomeComputador);
 

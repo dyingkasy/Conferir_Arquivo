@@ -128,28 +128,30 @@ begin
   FNFCeContexts.Clear;
   FNFeSaidaContexts.Clear;
 
-  for Path in FConfig.NFCeDatabasePaths do
-  begin
-    ContextConfig := FConfig;
-    ContextConfig.NFCeDatabasePath := Path;
-    ContextConfig.SourceDatabasePath := Path;
-    ContextConfig.QueueDatabasePath := BuildQueueDatabasePath(dkNFCe, Path);
-    Source := TConfereAgentSource.Create(ContextConfig);
-    Queue := TConfereAgentQueue.Create(ContextConfig.QueueDatabasePath);
-    Queue.EnsureSchema;
-    FNFCeContexts.Add(TConfereSyncContext.CreateNFCe(ContextConfig, ExtractFileName(Path), Source, Queue));
-  end;
+  if FConfig.EnabledNFCe then
+    for Path in FConfig.NFCeDatabasePaths do
+    begin
+      ContextConfig := FConfig;
+      ContextConfig.NFCeDatabasePath := Path;
+      ContextConfig.SourceDatabasePath := Path;
+      ContextConfig.QueueDatabasePath := BuildQueueDatabasePath(dkNFCe, Path);
+      Source := TConfereAgentSource.Create(ContextConfig);
+      Queue := TConfereAgentQueue.Create(ContextConfig.QueueDatabasePath);
+      Queue.EnsureSchema;
+      FNFCeContexts.Add(TConfereSyncContext.CreateNFCe(ContextConfig, ExtractFileName(Path), Source, Queue));
+    end;
 
-  for Path in FConfig.NFeSaidaDatabasePaths do
-  begin
-    ContextConfig := FConfig;
-    ContextConfig.NFeSaidaDatabasePath := Path;
-    ContextConfig.QueueDatabasePath := BuildQueueDatabasePath(dkNFeSaida, Path);
-    SourceNFe := TConfereAgentSourceNFeSaida.Create(ContextConfig);
-    Queue := TConfereAgentQueue.Create(ContextConfig.QueueDatabasePath);
-    Queue.EnsureSchema;
-    FNFeSaidaContexts.Add(TConfereSyncContext.CreateNFeSaida(ContextConfig, ExtractFileName(Path), SourceNFe, Queue));
-  end;
+  if FConfig.EnabledNFeSaida then
+    for Path in FConfig.NFeSaidaDatabasePaths do
+    begin
+      ContextConfig := FConfig;
+      ContextConfig.NFeSaidaDatabasePath := Path;
+      ContextConfig.QueueDatabasePath := BuildQueueDatabasePath(dkNFeSaida, Path);
+      SourceNFe := TConfereAgentSourceNFeSaida.Create(ContextConfig);
+      Queue := TConfereAgentQueue.Create(ContextConfig.QueueDatabasePath);
+      Queue.EnsureSchema;
+      FNFeSaidaContexts.Add(TConfereSyncContext.CreateNFeSaida(ContextConfig, ExtractFileName(Path), SourceNFe, Queue));
+    end;
 end;
 
 function TConfereSyncEngine.Validate(out AMessage: string): Boolean;
@@ -163,7 +165,7 @@ begin
   AMessage := '';
   if (FNFCeContexts.Count = 0) and (FNFeSaidaContexts.Count = 0) then
   begin
-    AMessage := 'Nenhuma origem Firebird configurada.';
+    AMessage := 'Nenhuma origem Firebird ativa/configurada.';
     Exit;
   end;
 
@@ -230,7 +232,7 @@ begin
   AMessage := '';
   if (FNFCeContexts.Count = 0) and (FNFeSaidaContexts.Count = 0) then
   begin
-    AMessage := 'Nenhuma origem Firebird configurada.';
+    AMessage := 'Nenhuma origem Firebird ativa/configurada.';
     Exit;
   end;
 

@@ -71,10 +71,26 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     end
     object lblBancoNFeSaida: TLabel
       Left = 16
-      Top = 117
+      Top = 133
       Width = 162
       Height = 17
       Caption = 'NFe Saida / 1 caminho por linha'
+    end
+    object chkAtivarNFCe: TCheckBox
+      Left = 379
+      Top = 31
+      Width = 115
+      Height = 17
+      Caption = 'Ativar NFC-e'
+      TabOrder = 0
+    end
+    object chkAtivarNFeSaida: TCheckBox
+      Left = 361
+      Top = 131
+      Width = 133
+      Height = 17
+      Caption = 'Ativar NFe Saida'
+      TabOrder = 2
     end
     object lblUsuario: TLabel
       Left = 16
@@ -96,22 +112,22 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
       Width = 478
       Height = 57
       ScrollBars = ssVertical
-      TabOrder = 0
+      TabOrder = 1
     end
     object mmBancosNFeSaida: TMemo
       Left = 16
-      Top = 136
+      Top = 152
       Width = 478
       Height = 33
       ScrollBars = ssVertical
-      TabOrder = 1
+      TabOrder = 3
     end
     object edUsuario: TEdit
       Left = 16
       Top = 201
       Width = 225
       Height = 25
-      TabOrder = 2
+      TabOrder = 4
     end
     object edSenha: TEdit
       Left = 265
@@ -119,7 +135,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
       Width = 229
       Height = 25
       PasswordChar = '*'
-      TabOrder = 3
+      TabOrder = 5
     end
   end
   object gbServidor: TGroupBox

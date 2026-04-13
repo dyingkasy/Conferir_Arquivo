@@ -14,8 +14,10 @@ type
     QueueDatabasePath: string;
     SourceDatabasePath: string;
     SourceDatabasePaths: TStringDynArray;
+    EnabledNFCe: Boolean;
     NFCeDatabasePath: string;
     NFCeDatabasePaths: TStringDynArray;
+    EnabledNFeSaida: Boolean;
     NFeSaidaDatabasePath: string;
     NFeSaidaDatabasePaths: TStringDynArray;
     FirebirdUser: string;
@@ -26,6 +28,7 @@ type
     IntervalSeconds: Integer;
     WindowDays: Integer;
     Enabled: Boolean;
+    FirstRunPending: Boolean;
     StartWithWindows: Boolean;
   end;
 
@@ -175,9 +178,6 @@ procedure ApplyDiscoveredPath(var APaths: TStringDynArray; const ADiscoveredPath
 var
   L: TStringDynArray;
 begin
-  if (Length(APaths) > 0) and FileExists(APaths[0]) then
-    Exit;
-
   if (ADiscoveredPath = '') or (not FileExists(ADiscoveredPath)) then
     Exit;
 
@@ -246,8 +246,10 @@ begin
   try
     Ini.WriteInteger('NFCe', 'Count', 1);
     Ini.WriteString('NFCe', 'Database1', ExpandFileName('C:\DEV\Confere_Arquivo\PAFECF.FDB'));
+    Ini.WriteBool('NFCe', 'Ativo', True);
     Ini.WriteInteger('NFeSaida', 'Count', 1);
     Ini.WriteString('NFeSaida', 'Database1', ExpandFileName('C:\DEV\Confere_Arquivo\BANCO.GDB'));
+    Ini.WriteBool('NFeSaida', 'Ativo', True);
     Ini.WriteString('Banco', 'Database', ExpandFileName('C:\DEV\Confere_Arquivo\PAFECF.FDB'));
     Ini.WriteString('Banco', 'DatabaseNFeSaida', ExpandFileName('C:\DEV\Confere_Arquivo\BANCO.GDB'));
     Ini.WriteString('Banco', 'User_Name', 'SYSDBA');
@@ -257,7 +259,8 @@ begin
     Ini.WriteString('Agente', 'InstalacaoID', DefaultInstalacaoID);
     Ini.WriteInteger('Agente', 'IntervaloSegundos', 15);
     Ini.WriteInteger('Agente', 'JanelaDias', 3);
-    Ini.WriteBool('Agente', 'Ativo', True);
+    Ini.WriteBool('Agente', 'Ativo', False);
+    Ini.WriteBool('Agente', 'PrimeiraExecucao', True);
     Ini.WriteBool('Agente', 'IniciarComWindows', False);
   finally
     Ini.Free;
@@ -284,11 +287,13 @@ begin
     AConfig.NFCeDatabasePaths := LoadSectionDatabasePaths(Ini, 'NFCe');
     if Length(AConfig.NFCeDatabasePaths) = 0 then
       AConfig.NFCeDatabasePaths := LoadLegacyDatabasePaths(Ini);
+    AConfig.EnabledNFCe := Ini.ReadBool('NFCe', 'Ativo', True);
 
     AConfig.NFeSaidaDatabasePaths := LoadSectionDatabasePaths(Ini, 'NFeSaida');
     if Length(AConfig.NFeSaidaDatabasePaths) = 0 then
       AConfig.NFeSaidaDatabasePaths := FilterDatabasePaths(
         SinglePathArray(Trim(Ini.ReadString('Banco', 'DatabaseNFeSaida', ''))));
+    AConfig.EnabledNFeSaida := Ini.ReadBool('NFeSaida', 'Ativo', True);
 
     ApplyDiscoveredPath(AConfig.NFCeDatabasePaths,
       ReadDiscoveredPath(IncludeTrailingPathDelimiter(AConfig.ExeRoot) + 'ConfigNFCe.ini', 'BANCO', 'LOCAL'));
@@ -320,7 +325,8 @@ begin
     AConfig.WindowDays := Ini.ReadInteger('Agente', 'JanelaDias', 3);
     if AConfig.WindowDays <= 0 then
       AConfig.WindowDays := 3;
-    AConfig.Enabled := Ini.ReadBool('Agente', 'Ativo', True);
+    AConfig.Enabled := Ini.ReadBool('Agente', 'Ativo', False);
+    AConfig.FirstRunPending := Ini.ReadBool('Agente', 'PrimeiraExecucao', False);
     AConfig.StartWithWindows := Ini.ReadBool('Agente', 'IniciarComWindows', CurrentStartupEnabled);
   finally
     Ini.Free;
@@ -336,6 +342,8 @@ begin
   try
     SaveSectionDatabasePaths(Ini, 'NFCe', 'Banco', 'Database', AConfig.NFCeDatabasePaths);
     SaveSectionDatabasePaths(Ini, 'NFeSaida', 'Banco', 'DatabaseNFeSaida', AConfig.NFeSaidaDatabasePaths);
+    Ini.WriteBool('NFCe', 'Ativo', AConfig.EnabledNFCe);
+    Ini.WriteBool('NFeSaida', 'Ativo', AConfig.EnabledNFeSaida);
     Ini.WriteString('Banco', 'User_Name', AConfig.FirebirdUser);
     Ini.WriteString('Banco', 'Password', AConfig.FirebirdPassword);
     Ini.WriteString('Servidor', 'BaseUrl', AConfig.ApiBaseUrl);
@@ -344,6 +352,7 @@ begin
     Ini.WriteInteger('Agente', 'IntervaloSegundos', AConfig.IntervalSeconds);
     Ini.WriteInteger('Agente', 'JanelaDias', AConfig.WindowDays);
     Ini.WriteBool('Agente', 'Ativo', AConfig.Enabled);
+    Ini.WriteBool('Agente', 'PrimeiraExecucao', AConfig.FirstRunPending);
     Ini.WriteBool('Agente', 'IniciarComWindows', AConfig.StartWithWindows);
   finally
     Ini.Free;

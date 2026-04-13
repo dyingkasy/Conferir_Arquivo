@@ -353,17 +353,34 @@ func (p *Postgres) ListEmpresas(ctx context.Context, token string) ([]model.Empr
 	rows, err := p.pool.Query(ctx, `
 		select te.cnpj,
 		       coalesce(te.razao_social, '') as razao_social,
-		       count(ne.id)::bigint as quantidade_xml,
-		       coalesce(to_char(max(ne.updated_at), 'YYYY-MM-DD HH24:MI:SS'), '') as ultima_atualizacao
+		       coalesce(nfce.qtd, 0)::bigint + coalesce(nfe.qtd, 0)::bigint as quantidade_xml,
+		       coalesce(
+		         to_char(
+		           greatest(
+		             coalesce(nfce.max_updated, timestamp '1900-01-01'),
+		             coalesce(nfe.max_updated, timestamp '1900-01-01')
+		           ),
+		           'YYYY-MM-DD HH24:MI:SS'
+		         ),
+		         ''
+		       ) as ultima_atualizacao
 		  from tenant_empresa te
 		  join tenant_auth_token tat
 		    on tat.cnpj_empresa = te.cnpj
 		   and tat.ativo = true
 		   and tat.token_sha256 = $1
-		  join nfce_cabecalho_espelho ne
-		    on ne.cnpj_empresa = te.cnpj
+		  left join (
+		    select cnpj_empresa, count(*) qtd, max(updated_at) max_updated
+		      from nfce_cabecalho_espelho
+		     group by cnpj_empresa
+		  ) nfce on nfce.cnpj_empresa = te.cnpj
+		  left join (
+		    select cnpj_empresa, count(*) qtd, max(updated_at) max_updated
+		      from nfe_saida_cabecalho_espelho
+		     group by cnpj_empresa
+		  ) nfe on nfe.cnpj_empresa = te.cnpj
 		 where te.ativo = true
-		 group by te.cnpj, te.razao_social
+		   and (coalesce(nfce.qtd, 0) > 0 or coalesce(nfe.qtd, 0) > 0)
 		 order by te.razao_social, te.cnpj
 	`, hashToken(token))
 	if err != nil {
@@ -380,6 +397,87 @@ func (p *Postgres) ListEmpresas(ctx context.Context, token string) ([]model.Empr
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+func (p *Postgres) GetNFeSaidaResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador string, dias int) (model.ResumoResponse, error) {
+	if dias <= 0 {
+		dias = 7
+	}
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return model.ResumoResponse{}, err
+	}
+
+	var resp model.ResumoResponse
+	resp.CNPJEmpresa = cnpj
+	baseSQL := `
+		select
+			count(*)::bigint,
+			count(*) filter (where upper(coalesce(status_operacional, '')) = 'AUTORIZADA')::bigint,
+			count(*) filter (where upper(coalesce(status_operacional, '')) = 'CANCELADA')::bigint,
+			count(*) filter (where upper(coalesce(status_operacional, '')) = 'NAO_AUTORIZADA')::bigint,
+			0::bigint,
+			coalesce(sum(valor_total), 0)::float8,
+			coalesce(sum(case when upper(coalesce(status_operacional, '')) = 'AUTORIZADA' then valor_total else 0 end), 0)::float8,
+			coalesce(sum(case when upper(coalesce(status_operacional, '')) = 'CANCELADA' then valor_total else 0 end), 0)::float8,
+			coalesce(sum(case when upper(coalesce(status_operacional, '')) = 'NAO_AUTORIZADA' then valor_total else 0 end), 0)::float8,
+			0::float8,
+			coalesce(sum(base_icms), 0)::float8,
+			coalesce(sum(valor_icms), 0)::float8,
+			coalesce(sum(valor_pis), 0)::float8,
+			coalesce(sum(valor_cofins), 0)::float8,
+			0::float8,
+			0::float8
+		from nfe_saida_cabecalho_espelho
+		where cnpj_empresa = $1
+	`
+	args := []any{cnpj}
+	argPos := 2
+
+	if strings.TrimSpace(dataInicial) != "" {
+		baseSQL += fmt.Sprintf(" and coalesce(data_emissao, current_date) >= $%d", argPos)
+		args = append(args, dataInicial)
+		argPos++
+	}
+	if strings.TrimSpace(dataFinal) != "" {
+		baseSQL += fmt.Sprintf(" and coalesce(data_emissao, current_date) <= $%d", argPos)
+		args = append(args, dataFinal)
+		argPos++
+	}
+	if strings.TrimSpace(serie) != "" {
+		baseSQL += fmt.Sprintf(" and coalesce(serie_nota_fiscal, 0) = $%d", argPos)
+		args = append(args, strings.TrimSpace(serie))
+		argPos++
+	}
+	if strings.TrimSpace(nomeComputador) != "" {
+		baseSQL += fmt.Sprintf(" and upper(coalesce(nome_computador, '')) = upper($%d)", argPos)
+		args = append(args, strings.TrimSpace(nomeComputador))
+		argPos++
+	}
+	if strings.TrimSpace(dataInicial) == "" && strings.TrimSpace(dataFinal) == "" {
+		baseSQL += fmt.Sprintf(" and coalesce(data_emissao, current_date) >= current_date - ($%d::int)", argPos)
+		args = append(args, dias)
+	}
+
+	err := p.pool.QueryRow(ctx, baseSQL, args...).Scan(
+		&resp.QuantidadeTotal,
+		&resp.QuantidadeTransmitida,
+		&resp.QuantidadeContingencia,
+		&resp.QuantidadeSemFiscal,
+		&resp.QuantidadeErro,
+		&resp.ValorTotalDocumento,
+		&resp.ValorTotalTransmitido,
+		&resp.ValorTotalContingencia,
+		&resp.ValorTotalSemFiscal,
+		&resp.ValorTotalErro,
+		&resp.ValorBaseICMS,
+		&resp.ValorICMS,
+		&resp.ValorPIS,
+		&resp.ValorCOFINS,
+		&resp.ValorImpostoFederal,
+		&resp.ValorImpostoEstadual,
+	)
+	return resp, err
 }
 
 func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador string, limit int) ([]model.NFCeListItem, error) {
@@ -514,6 +612,149 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 	return items, rows.Err()
 }
 
+func (p *Postgres) ListNFeSaida(ctx context.Context, cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador string, limit int) ([]model.NFCeListItem, error) {
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+
+	baseSQL := `
+		select source_id,
+		       instalacao_id,
+		       coalesce(nome_computador, ''),
+		       case
+		         when upper(coalesce(status_operacional, '')) = 'AUTORIZADA' then 'AUTORIZADA'
+		         when upper(coalesce(status_operacional, '')) = 'CANCELADA' then 'CANCELADA'
+		         else 'NAO_AUTORIZADA'
+		       end as grupo_conferencia,
+		       data_emissao,
+		       hora_saida,
+		       data_saida,
+		       numero_nota,
+		       serie_nota_fiscal,
+		       chave_acesso,
+		       protocolo,
+		       status_operacional,
+		       '' as status_erro,
+		       '' as nfce_offline,
+		       status_cancelado as nfce_cancelada,
+		       valor_total,
+		       base_icms,
+		       valor_icms,
+		       valor_pis,
+		       valor_cofins,
+		       0::float8 as imposto_federal,
+		       0::float8 as imposto_estadual,
+		       '' as nome_cliente,
+		       documento_cliente
+		from nfe_saida_cabecalho_espelho
+		where cnpj_empresa = $1
+	`
+	args := []any{cnpj}
+	argPos := 2
+
+	if strings.TrimSpace(status) != "" {
+		status = strings.ToUpper(strings.TrimSpace(status))
+		switch status {
+		case "AUTORIZADA", "CANCELADA", "NAO_AUTORIZADA":
+			baseSQL += fmt.Sprintf(" and upper(coalesce(status_operacional, '')) = $%d", argPos)
+			args = append(args, status)
+			argPos++
+		}
+	}
+	if strings.TrimSpace(dataInicial) != "" {
+		baseSQL += fmt.Sprintf(" and data_emissao >= $%d", argPos)
+		args = append(args, dataInicial)
+		argPos++
+	}
+	if strings.TrimSpace(dataFinal) != "" {
+		baseSQL += fmt.Sprintf(" and data_emissao <= $%d", argPos)
+		args = append(args, dataFinal)
+		argPos++
+	}
+	if strings.TrimSpace(serie) != "" {
+		baseSQL += fmt.Sprintf(" and coalesce(serie_nota_fiscal, 0) = $%d", argPos)
+		args = append(args, strings.TrimSpace(serie))
+		argPos++
+	}
+	if strings.TrimSpace(nomeComputador) != "" {
+		baseSQL += fmt.Sprintf(" and upper(coalesce(nome_computador, '')) = upper($%d)", argPos)
+		args = append(args, strings.TrimSpace(nomeComputador))
+		argPos++
+	}
+
+	baseSQL += fmt.Sprintf(" order by coalesce(data_emissao, current_date) desc, source_id desc limit $%d", argPos)
+	args = append(args, limit)
+
+	rows, err := p.pool.Query(ctx, baseSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.NFCeListItem, 0, limit)
+	for rows.Next() {
+		var item model.NFCeListItem
+		var dataVenda *time.Time
+		var dataTransmissao *time.Time
+		var valorDoc *float64
+		var baseICMS *float64
+		var icms *float64
+		var pis *float64
+		var cofins *float64
+		var impostoFederal *float64
+		var impostoEstadual *float64
+		if err := rows.Scan(
+			&item.SourceID,
+			&item.InstalacaoID,
+			&item.NomeComputador,
+			&item.GrupoConferencia,
+			&dataVenda,
+			&item.HoraVenda,
+			&dataTransmissao,
+			&item.NumeroNFCe,
+			&item.SerieNFCe,
+			&item.ChaveAcesso,
+			&item.Protocolo,
+			&item.StatusOperacional,
+			&item.StatusErro,
+			&item.NFCeOffline,
+			&item.NFCeCancelada,
+			&valorDoc,
+			&baseICMS,
+			&icms,
+			&pis,
+			&cofins,
+			&impostoFederal,
+			&impostoEstadual,
+			&item.NomeCliente,
+			&item.DocumentoCliente,
+		); err != nil {
+			return nil, err
+		}
+		if dataVenda != nil {
+			v := dataVenda.Format("2006-01-02")
+			item.DataVenda = &v
+		}
+		if dataTransmissao != nil {
+			v := dataTransmissao.Format("2006-01-02")
+			item.DataTransmissao = &v
+		}
+		item.ValorDocumento = valorDoc
+		item.BaseICMS = baseICMS
+		item.ICMS = icms
+		item.PIS = pis
+		item.COFINS = cofins
+		item.ImpostoFederal = impostoFederal
+		item.ImpostoEstadual = impostoEstadual
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func (p *Postgres) ListSeries(ctx context.Context, cnpj, token string) ([]model.FiltroValorItem, error) {
 	cnpj = model.NormalizeDigits(cnpj)
 	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
@@ -543,6 +784,35 @@ func (p *Postgres) ListSeries(ctx context.Context, cnpj, token string) ([]model.
 	return items, rows.Err()
 }
 
+func (p *Postgres) ListNFeSaidaSeries(ctx context.Context, cnpj, token string) ([]model.FiltroValorItem, error) {
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return nil, err
+	}
+
+	rows, err := p.pool.Query(ctx, `
+		select distinct trim(coalesce(serie_nota_fiscal::text, ''))
+		from nfe_saida_cabecalho_espelho
+		where cnpj_empresa = $1
+		  and coalesce(serie_nota_fiscal, 0) > 0
+		order by 1
+	`, cnpj)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.FiltroValorItem, 0)
+	for rows.Next() {
+		var item model.FiltroValorItem
+		if err := rows.Scan(&item.Valor); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func (p *Postgres) ListComputadores(ctx context.Context, cnpj, token string) ([]model.FiltroValorItem, error) {
 	cnpj = model.NormalizeDigits(cnpj)
 	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
@@ -552,6 +822,35 @@ func (p *Postgres) ListComputadores(ctx context.Context, cnpj, token string) ([]
 	rows, err := p.pool.Query(ctx, `
 		select distinct trim(coalesce(nome_computador, ''))
 		from nfce_cabecalho_espelho
+		where cnpj_empresa = $1
+		  and trim(coalesce(nome_computador, '')) <> ''
+		order by 1
+	`, cnpj)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.FiltroValorItem, 0)
+	for rows.Next() {
+		var item model.FiltroValorItem
+		if err := rows.Scan(&item.Valor); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (p *Postgres) ListNFeSaidaComputadores(ctx context.Context, cnpj, token string) ([]model.FiltroValorItem, error) {
+	cnpj = model.NormalizeDigits(cnpj)
+	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
+		return nil, err
+	}
+
+	rows, err := p.pool.Query(ctx, `
+		select distinct trim(coalesce(nome_computador, ''))
+		from nfe_saida_cabecalho_espelho
 		where cnpj_empresa = $1
 		  and trim(coalesce(nome_computador, '')) <> ''
 		order by 1

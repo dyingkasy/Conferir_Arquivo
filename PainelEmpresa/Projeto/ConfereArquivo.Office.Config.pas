@@ -13,6 +13,7 @@ type
     ApiBaseUrl: string;
     ApiToken: string;
     CNPJEmpresa: string;
+    DocumentoTipo: string;
     DiasResumo: Integer;
   end;
 
@@ -49,6 +50,7 @@ begin
     Ini.WriteString('Servidor', 'BaseUrl', 'http://qualifazentregas.vps-kinghost.net');
     Ini.WriteString('Servidor', 'Token', '6c0990ebb3e5ea1b5c356abc81675280e104d6bf3e2e4f10');
     Ini.WriteString('Empresa', 'CNPJ', '12345678000199');
+    Ini.WriteString('Painel', 'DocumentoTipo', 'NFCE');
     Ini.WriteInteger('Painel', 'DiasResumo', 7);
   finally
     Ini.Free;
@@ -72,6 +74,9 @@ begin
     AConfig.ApiBaseUrl := Trim(Ini.ReadString('Servidor', 'BaseUrl', ''));
     AConfig.ApiToken := Trim(Ini.ReadString('Servidor', 'Token', ''));
     AConfig.CNPJEmpresa := Trim(Ini.ReadString('Empresa', 'CNPJ', ''));
+    AConfig.DocumentoTipo := UpperCase(Trim(Ini.ReadString('Painel', 'DocumentoTipo', 'NFCE')));
+    if (AConfig.DocumentoTipo <> 'NFCE') and (AConfig.DocumentoTipo <> 'NFE_SAIDA') then
+      AConfig.DocumentoTipo := 'NFCE';
     AConfig.DiasResumo := Ini.ReadInteger('Painel', 'DiasResumo', 7);
     if AConfig.DiasResumo <= 0 then
       AConfig.DiasResumo := 7;
@@ -90,6 +95,7 @@ begin
     Ini.WriteString('Servidor', 'BaseUrl', AConfig.ApiBaseUrl);
     Ini.WriteString('Servidor', 'Token', AConfig.ApiToken);
     Ini.WriteString('Empresa', 'CNPJ', AConfig.CNPJEmpresa);
+    Ini.WriteString('Painel', 'DocumentoTipo', AConfig.DocumentoTipo);
     Ini.WriteInteger('Painel', 'DiasResumo', AConfig.DiasResumo);
   finally
     Ini.Free;
