@@ -78,8 +78,8 @@ type
     function LoadEmpresas: TArray<TConfereEmpresaDisponivel>;
     function LoadSeries(const ADocType, ACNPJ: string): TArray<TConfereFiltroValor>;
     function LoadComputadores(const ADocType, ACNPJ: string): TArray<TConfereFiltroValor>;
-    function LoadResumo(const ADocType, ACNPJ, ADataInicial, ADataFinal, ASerie, ANomeComputador: string; ADias: Integer): TConfereResumo;
-    function LoadLista(const ADocType, ACNPJ, AStatus, ADataInicial, ADataFinal, ASerie, ANomeComputador: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
+    function LoadResumo(const ADocType, ACNPJ, ADataInicial, ADataFinal, ASerie, ANomeComputador, ANumeroDocumento: string; ADias: Integer): TConfereResumo;
+    function LoadLista(const ADocType, ACNPJ, AStatus, ADataInicial, ADataFinal, ASerie, ANomeComputador, ANumeroDocumento: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
   end;
 
 implementation
@@ -253,7 +253,7 @@ begin
 end;
 
 function TConfereOfficeClient.LoadResumo(const ADocType, ACNPJ, ADataInicial, ADataFinal,
-  ASerie, ANomeComputador: string; ADias: Integer): TConfereResumo;
+  ASerie, ANomeComputador, ANumeroDocumento: string; ADias: Integer): TConfereResumo;
 var
   Json: TJSONObject;
   Raw: string;
@@ -276,6 +276,8 @@ begin
   end;
   if Trim(ANomeComputador) <> '' then
     Url := Url + '&nome_computador=' + TNetEncoding.URL.Encode(ANomeComputador);
+  if Trim(ANumeroDocumento) <> '' then
+    Url := Url + '&numero_documento=' + TNetEncoding.URL.Encode(Trim(ANumeroDocumento));
 
   Raw := GetJson(BuildUrl(Url));
   Json := TJSONObject.ParseJSONValue(Raw) as TJSONObject;
@@ -304,7 +306,7 @@ begin
 end;
 
 function TConfereOfficeClient.LoadLista(const ADocType, ACNPJ, AStatus, ADataInicial,
-  ADataFinal, ASerie, ANomeComputador: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
+  ADataFinal, ASerie, ANomeComputador, ANumeroDocumento: string; ALimit: Integer): TArray<TConfereNotaConsulta>;
 var
   Url, Raw: string;
   Json: TJSONObject;
@@ -332,6 +334,8 @@ begin
   end;
   if Trim(ANomeComputador) <> '' then
     Url := Url + '&nome_computador=' + TNetEncoding.URL.Encode(ANomeComputador);
+  if Trim(ANumeroDocumento) <> '' then
+    Url := Url + '&numero_documento=' + TNetEncoding.URL.Encode(Trim(ANumeroDocumento));
 
   Raw := GetJson(BuildUrl(Url));
   Json := TJSONObject.ParseJSONValue(Raw) as TJSONObject;

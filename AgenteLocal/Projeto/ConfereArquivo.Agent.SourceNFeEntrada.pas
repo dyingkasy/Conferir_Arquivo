@@ -32,6 +32,10 @@ uses
   FireDAC.DatS, FireDAC.DApt.Intf, FireDAC.Stan.Async, FireDAC.DApt,
   ConfereArquivo.Logger;
 
+const
+  NFE_ENT_SYNC_TABLE = 'CONF_ARQ_SYNC_NFE_ENT';
+  NFE_ENT_SYNC_PK = 'PK_CONF_ARQ_SYNC_NFENT';
+
 function CurrencyFieldValue(const AField: TField): Currency;
 begin
   if Assigned(AField) and (not AField.IsNull) then
@@ -99,7 +103,7 @@ begin
   try
     Q.Connection := FConnection;
     Q.SQL.Text :=
-      'select count(*) qtd from rdb$relation_fields where rdb$relation_name = ''CONFERE_ARQUIVO_SYNC_NFE_ENTRADA'' and rdb$field_name = :f';
+      'select count(*) qtd from rdb$relation_fields where rdb$relation_name = ''' + NFE_ENT_SYNC_TABLE + ''' and rdb$field_name = :f';
     Q.ParamByName('f').AsString := UpperCase(AColumn);
     Q.Open;
     Result := Q.FieldByName('QTD').AsInteger > 0;
@@ -117,19 +121,19 @@ begin
   try
     Q.Connection := FConnection;
     Q.SQL.Text :=
-      'select count(*) qtd from rdb$relations where rdb$relation_name = ''CONFERE_ARQUIVO_SYNC_NFE_ENTRADA''';
+      'select count(*) qtd from rdb$relations where rdb$relation_name = ''' + NFE_ENT_SYNC_TABLE + '''';
     Q.Open;
     if Q.FieldByName('QTD').AsInteger = 0 then
     begin
       Q.Close;
       Q.SQL.Text :=
-        'create table CONFERE_ARQUIVO_SYNC_NFE_ENTRADA (' +
+        'create table ' + NFE_ENT_SYNC_TABLE + ' (' +
         '  SOURCE_ID integer not null,' +
         '  HASH_INCREMENTO integer not null,' +
         '  PAYLOAD_REV integer default 0,' +
         '  STATUS_OPERACIONAL varchar(40),' +
         '  ULTIMO_ENVIO timestamp,' +
-        '  constraint PK_CONFERE_ARQ_SYNC_NFE_ENT primary key (SOURCE_ID)' +
+        '  constraint ' + NFE_ENT_SYNC_PK + ' primary key (SOURCE_ID)' +
         ')';
       Q.ExecSQL;
       FConnection.Commit;
@@ -138,7 +142,7 @@ begin
     if not SyncColumnExists('PAYLOAD_REV') then
     begin
       Q.Close;
-      Q.SQL.Text := 'alter table CONFERE_ARQUIVO_SYNC_NFE_ENTRADA add PAYLOAD_REV integer default 0';
+      Q.SQL.Text := 'alter table ' + NFE_ENT_SYNC_TABLE + ' add PAYLOAD_REV integer default 0';
       Q.ExecSQL;
       FConnection.Commit;
     end;
@@ -214,7 +218,7 @@ begin
   try
     Q.Connection := FConnection;
     Q.SQL.Text :=
-      'select hash_incremento, coalesce(payload_rev, 0) payload_rev from CONFERE_ARQUIVO_SYNC_NFE_ENTRADA where source_id = :id';
+      'select hash_incremento, coalesce(payload_rev, 0) payload_rev from ' + NFE_ENT_SYNC_TABLE + ' where source_id = :id';
     Q.ParamByName('id').AsInteger := AItem.SourceID;
     Q.Open;
     if not Q.IsEmpty then
@@ -235,7 +239,7 @@ begin
   try
     Q.Connection := FConnection;
     Q.SQL.Text :=
-      'update or insert into CONFERE_ARQUIVO_SYNC_NFE_ENTRADA (source_id, hash_incremento, payload_rev, status_operacional, ultimo_envio) ' +
+      'update or insert into ' + NFE_ENT_SYNC_TABLE + ' (source_id, hash_incremento, payload_rev, status_operacional, ultimo_envio) ' +
       'values (:source_id, :hash_incremento, :payload_rev, :status_operacional, :ultimo_envio) matching (source_id)';
     Q.ParamByName('source_id').AsInteger := ASourceID;
     Q.ParamByName('hash_incremento').AsInteger := AHashIncremento;

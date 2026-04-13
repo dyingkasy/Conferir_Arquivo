@@ -225,8 +225,15 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Height = 15
         Caption = 'Serie'
       end
-      object lblComputador: TLabel
+      object lblNumero: TLabel
         Left = 712
+        Top = 23
+        Width = 43
+        Height = 15
+        Caption = 'Numero'
+      end
+      object lblComputador: TLabel
+        Left = 824
         Top = 23
         Width = 68
         Height = 15
@@ -277,21 +284,28 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
         Style = csDropDownList
         TabOrder = 4
       end
-      object cbComputador: TComboBox
+      object edNumeroDocumento: TEdit
         Left = 712
         Top = 40
-        Width = 130
+        Width = 100
         Height = 23
-        Style = csDropDownList
         TabOrder = 5
       end
+      object cbComputador: TComboBox
+        Left = 824
+        Top = 40
+        Width = 104
+        Height = 23
+        Style = csDropDownList
+        TabOrder = 6
+      end
       object btnConsultar: TButton
-        Left = 850
+        Left = 824
         Top = 36
-        Width = 76
+        Width = 104
         Height = 28
         Caption = 'Consultar'
-        TabOrder = 6
+        TabOrder = 7
         OnClick = btnConsultarClick
       end
     end

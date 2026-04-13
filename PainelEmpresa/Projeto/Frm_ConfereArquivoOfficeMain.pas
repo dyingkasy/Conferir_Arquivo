@@ -34,11 +34,13 @@ type
     lblDataInicial: TLabel;
     lblDataFinal: TLabel;
     lblSerie: TLabel;
+    lblNumero: TLabel;
     lblComputador: TLabel;
     cbStatus: TComboBox;
     cbDocumento: TComboBox;
     cbSerie: TComboBox;
     cbComputador: TComboBox;
+    edNumeroDocumento: TEdit;
     dtDataInicial: TDateTimePicker;
     dtDataFinal: TDateTimePicker;
     btnConsultar: TButton;
@@ -591,6 +593,7 @@ var
   Resumo: TConfereResumo;
   SerieFiltro: string;
   ComputadorFiltro: string;
+  NumeroDocumento: string;
 begin
   if cbSerie.ItemIndex > 0 then
     SerieFiltro := cbSerie.Text
@@ -600,6 +603,7 @@ begin
     ComputadorFiltro := cbComputador.Text
   else
     ComputadorFiltro := '';
+  NumeroDocumento := Trim(edNumeroDocumento.Text);
 
   Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
   try
@@ -610,6 +614,7 @@ begin
       FormatDateTime('yyyy-mm-dd', dtDataFinal.Date),
       SerieFiltro,
       ComputadorFiltro,
+      NumeroDocumento,
       FConfig.DiasResumo);
     edTotal.Text := IntToStr(Resumo.QuantidadeTotal);
     edTransmitidas.Text := IntToStr(Resumo.QuantidadeTransmitida);
@@ -640,6 +645,7 @@ var
   StatusValue: string;
   SerieFiltro: string;
   ComputadorFiltro: string;
+  NumeroDocumento: string;
 begin
   Client := TConfereOfficeClient.Create(FConfig.ApiBaseUrl, FConfig.ApiToken);
   try
@@ -654,6 +660,7 @@ begin
       ComputadorFiltro := cbComputador.Text
     else
       ComputadorFiltro := '';
+    NumeroDocumento := Trim(edNumeroDocumento.Text);
     Items := Client.LoadLista(
       CurrentDocType,
       FConfig.CNPJEmpresa,
@@ -662,6 +669,7 @@ begin
       FormatDateTime('yyyy-mm-dd', dtDataFinal.Date),
       SerieFiltro,
       ComputadorFiltro,
+      NumeroDocumento,
       250);
     sgNotas.RowCount := Max(Length(Items) + 1, 2);
     for Row := 1 to sgNotas.RowCount - 1 do

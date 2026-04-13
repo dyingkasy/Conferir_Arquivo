@@ -222,6 +222,7 @@ func (h *Handler) Resumo(w http.ResponseWriter, r *http.Request) {
 	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
 	serie := strings.TrimSpace(r.URL.Query().Get("serie_nfce"))
 	nomeComputador := strings.TrimSpace(r.URL.Query().Get("nome_computador"))
+	numeroDocumento := strings.TrimSpace(r.URL.Query().Get("numero_documento"))
 	dias := 7
 	if value := strings.TrimSpace(r.URL.Query().Get("dias")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
@@ -232,7 +233,7 @@ func (h *Handler) Resumo(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
 		return
 	}
-	resp, err := h.store.GetResumo(r.Context(), cnpj, token, dataInicial, dataFinal, serie, nomeComputador, dias)
+	resp, err := h.store.GetResumo(r.Context(), cnpj, token, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento, dias)
 	if err != nil {
 		h.writeAuthError(w, err)
 		return
@@ -248,6 +249,7 @@ func (h *Handler) Lista(w http.ResponseWriter, r *http.Request) {
 	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
 	serie := strings.TrimSpace(r.URL.Query().Get("serie_nfce"))
 	nomeComputador := strings.TrimSpace(r.URL.Query().Get("nome_computador"))
+	numeroDocumento := strings.TrimSpace(r.URL.Query().Get("numero_documento"))
 	limit := 200
 	if value := strings.TrimSpace(r.URL.Query().Get("limit")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
@@ -258,7 +260,7 @@ func (h *Handler) Lista(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
 		return
 	}
-	items, err := h.store.ListNFCe(r.Context(), cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, limit)
+	items, err := h.store.ListNFCe(r.Context(), cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento, limit)
 	if err != nil {
 		h.writeAuthError(w, err)
 		return
@@ -315,6 +317,7 @@ func (h *Handler) NFeSaidaResumo(w http.ResponseWriter, r *http.Request) {
 	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
 	serie := strings.TrimSpace(r.URL.Query().Get("serie_nota_fiscal"))
 	nomeComputador := strings.TrimSpace(r.URL.Query().Get("nome_computador"))
+	numeroDocumento := strings.TrimSpace(r.URL.Query().Get("numero_documento"))
 	dias := 7
 	if value := strings.TrimSpace(r.URL.Query().Get("dias")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
@@ -325,7 +328,7 @@ func (h *Handler) NFeSaidaResumo(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
 		return
 	}
-	resp, err := h.store.GetNFeSaidaResumo(r.Context(), cnpj, token, dataInicial, dataFinal, serie, nomeComputador, dias)
+	resp, err := h.store.GetNFeSaidaResumo(r.Context(), cnpj, token, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento, dias)
 	if err != nil {
 		h.writeAuthError(w, err)
 		return
@@ -341,6 +344,7 @@ func (h *Handler) NFeSaidaLista(w http.ResponseWriter, r *http.Request) {
 	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
 	serie := strings.TrimSpace(r.URL.Query().Get("serie_nota_fiscal"))
 	nomeComputador := strings.TrimSpace(r.URL.Query().Get("nome_computador"))
+	numeroDocumento := strings.TrimSpace(r.URL.Query().Get("numero_documento"))
 	limit := 200
 	if value := strings.TrimSpace(r.URL.Query().Get("limit")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
@@ -351,7 +355,7 @@ func (h *Handler) NFeSaidaLista(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
 		return
 	}
-	items, err := h.store.ListNFeSaida(r.Context(), cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, limit)
+	items, err := h.store.ListNFeSaida(r.Context(), cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento, limit)
 	if err != nil {
 		h.writeAuthError(w, err)
 		return
@@ -408,6 +412,7 @@ func (h *Handler) NFeEntradaResumo(w http.ResponseWriter, r *http.Request) {
 	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
 	serie := strings.TrimSpace(r.URL.Query().Get("serie_nota"))
 	nomeComputador := strings.TrimSpace(r.URL.Query().Get("nome_computador"))
+	numeroDocumento := strings.TrimSpace(r.URL.Query().Get("numero_documento"))
 	dias := 7
 	if value := strings.TrimSpace(r.URL.Query().Get("dias")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
@@ -418,7 +423,7 @@ func (h *Handler) NFeEntradaResumo(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
 		return
 	}
-	resp, err := h.store.GetNFeEntradaResumo(r.Context(), cnpj, token, dataInicial, dataFinal, serie, nomeComputador, dias)
+	resp, err := h.store.GetNFeEntradaResumo(r.Context(), cnpj, token, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento, dias)
 	if err != nil {
 		h.writeAuthError(w, err)
 		return
@@ -434,6 +439,7 @@ func (h *Handler) NFeEntradaLista(w http.ResponseWriter, r *http.Request) {
 	dataFinal := strings.TrimSpace(r.URL.Query().Get("data_final"))
 	serie := strings.TrimSpace(r.URL.Query().Get("serie_nota"))
 	nomeComputador := strings.TrimSpace(r.URL.Query().Get("nome_computador"))
+	numeroDocumento := strings.TrimSpace(r.URL.Query().Get("numero_documento"))
 	limit := 200
 	if value := strings.TrimSpace(r.URL.Query().Get("limit")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
@@ -444,7 +450,7 @@ func (h *Handler) NFeEntradaLista(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
 		return
 	}
-	items, err := h.store.ListNFeEntrada(r.Context(), cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, limit)
+	items, err := h.store.ListNFeEntrada(r.Context(), cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento, limit)
 	if err != nil {
 		h.writeAuthError(w, err)
 		return

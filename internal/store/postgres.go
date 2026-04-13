@@ -320,7 +320,7 @@ func (p *Postgres) SaveNFeEntradaLote(ctx context.Context, lote model.LoteReques
 	return tx.Commit(ctx)
 }
 
-func (p *Postgres) GetResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador string, dias int) (model.ResumoResponse, error) {
+func (p *Postgres) GetResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento string, dias int) (model.ResumoResponse, error) {
 	if dias <= 0 {
 		dias = 7
 	}
@@ -373,6 +373,11 @@ func (p *Postgres) GetResumo(ctx context.Context, cnpj, token, dataInicial, data
 	if strings.TrimSpace(nomeComputador) != "" {
 		baseSQL += fmt.Sprintf(" and upper(coalesce(nome_computador, '')) = upper($%d)", argPos)
 		args = append(args, strings.TrimSpace(nomeComputador))
+		argPos++
+	}
+	if strings.TrimSpace(numeroDocumento) != "" {
+		baseSQL += fmt.Sprintf(" and trim(coalesce(num_nfce::text, '')) = $%d", argPos)
+		args = append(args, strings.TrimSpace(numeroDocumento))
 		argPos++
 	}
 	if strings.TrimSpace(dataInicial) == "" && strings.TrimSpace(dataFinal) == "" {
@@ -462,7 +467,7 @@ func (p *Postgres) ListEmpresas(ctx context.Context, token string) ([]model.Empr
 	return items, rows.Err()
 }
 
-func (p *Postgres) GetNFeSaidaResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador string, dias int) (model.ResumoResponse, error) {
+func (p *Postgres) GetNFeSaidaResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento string, dias int) (model.ResumoResponse, error) {
 	if dias <= 0 {
 		dias = 7
 	}
@@ -517,6 +522,11 @@ func (p *Postgres) GetNFeSaidaResumo(ctx context.Context, cnpj, token, dataInici
 		args = append(args, strings.TrimSpace(nomeComputador))
 		argPos++
 	}
+	if strings.TrimSpace(numeroDocumento) != "" {
+		baseSQL += fmt.Sprintf(" and trim(coalesce(numero_nota::text, '')) = $%d", argPos)
+		args = append(args, strings.TrimSpace(numeroDocumento))
+		argPos++
+	}
 	if strings.TrimSpace(dataInicial) == "" && strings.TrimSpace(dataFinal) == "" {
 		baseSQL += fmt.Sprintf(" and coalesce(data_emissao, current_date) >= current_date - ($%d::int)", argPos)
 		args = append(args, dias)
@@ -543,7 +553,7 @@ func (p *Postgres) GetNFeSaidaResumo(ctx context.Context, cnpj, token, dataInici
 	return resp, err
 }
 
-func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador string, limit int) ([]model.NFCeListItem, error) {
+func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento string, limit int) ([]model.NFCeListItem, error) {
 	cnpj = model.NormalizeDigits(cnpj)
 	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
 		return nil, err
@@ -603,6 +613,11 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 	if strings.TrimSpace(nomeComputador) != "" {
 		baseSQL += fmt.Sprintf(" and upper(coalesce(nome_computador, '')) = upper($%d)", argPos)
 		args = append(args, strings.TrimSpace(nomeComputador))
+		argPos++
+	}
+	if strings.TrimSpace(numeroDocumento) != "" {
+		baseSQL += fmt.Sprintf(" and trim(coalesce(num_nfce::text, '')) = $%d", argPos)
+		args = append(args, strings.TrimSpace(numeroDocumento))
 		argPos++
 	}
 
@@ -675,7 +690,7 @@ func (p *Postgres) ListNFCe(ctx context.Context, cnpj, token, status, dataInicia
 	return items, rows.Err()
 }
 
-func (p *Postgres) ListNFeSaida(ctx context.Context, cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador string, limit int) ([]model.NFCeListItem, error) {
+func (p *Postgres) ListNFeSaida(ctx context.Context, cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento string, limit int) ([]model.NFCeListItem, error) {
 	cnpj = model.NormalizeDigits(cnpj)
 	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
 		return nil, err
@@ -746,6 +761,11 @@ func (p *Postgres) ListNFeSaida(ctx context.Context, cnpj, token, status, dataIn
 	if strings.TrimSpace(nomeComputador) != "" {
 		baseSQL += fmt.Sprintf(" and upper(coalesce(nome_computador, '')) = upper($%d)", argPos)
 		args = append(args, strings.TrimSpace(nomeComputador))
+		argPos++
+	}
+	if strings.TrimSpace(numeroDocumento) != "" {
+		baseSQL += fmt.Sprintf(" and trim(coalesce(numero_nota::text, '')) = $%d", argPos)
+		args = append(args, strings.TrimSpace(numeroDocumento))
 		argPos++
 	}
 
@@ -934,7 +954,7 @@ func (p *Postgres) ListNFeSaidaComputadores(ctx context.Context, cnpj, token str
 	return items, rows.Err()
 }
 
-func (p *Postgres) GetNFeEntradaResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador string, dias int) (model.ResumoResponse, error) {
+func (p *Postgres) GetNFeEntradaResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento string, dias int) (model.ResumoResponse, error) {
 	if dias <= 0 {
 		dias = 7
 	}
@@ -989,6 +1009,11 @@ func (p *Postgres) GetNFeEntradaResumo(ctx context.Context, cnpj, token, dataIni
 		args = append(args, strings.TrimSpace(nomeComputador))
 		argPos++
 	}
+	if strings.TrimSpace(numeroDocumento) != "" {
+		baseSQL += fmt.Sprintf(" and trim(coalesce(numero_nota, '')) = $%d", argPos)
+		args = append(args, strings.TrimSpace(numeroDocumento))
+		argPos++
+	}
 	if strings.TrimSpace(dataInicial) == "" && strings.TrimSpace(dataFinal) == "" {
 		baseSQL += fmt.Sprintf(" and coalesce(data_emissao, current_date) >= current_date - ($%d::int)", argPos)
 		args = append(args, dias)
@@ -1015,7 +1040,7 @@ func (p *Postgres) GetNFeEntradaResumo(ctx context.Context, cnpj, token, dataIni
 	return resp, err
 }
 
-func (p *Postgres) ListNFeEntrada(ctx context.Context, cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador string, limit int) ([]model.NFCeListItem, error) {
+func (p *Postgres) ListNFeEntrada(ctx context.Context, cnpj, token, status, dataInicial, dataFinal, serie, nomeComputador, numeroDocumento string, limit int) ([]model.NFCeListItem, error) {
 	cnpj = model.NormalizeDigits(cnpj)
 	if _, err := p.ValidateTenantToken(ctx, cnpj, token); err != nil {
 		return nil, err
@@ -1088,6 +1113,11 @@ func (p *Postgres) ListNFeEntrada(ctx context.Context, cnpj, token, status, data
 	if strings.TrimSpace(nomeComputador) != "" {
 		baseSQL += fmt.Sprintf(" and upper(coalesce(nome_computador, '')) = upper($%d)", argPos)
 		args = append(args, strings.TrimSpace(nomeComputador))
+		argPos++
+	}
+	if strings.TrimSpace(numeroDocumento) != "" {
+		baseSQL += fmt.Sprintf(" and trim(coalesce(numero_nota, '')) = $%d", argPos)
+		args = append(args, strings.TrimSpace(numeroDocumento))
 		argPos++
 	}
 
