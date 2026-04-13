@@ -8,6 +8,8 @@ uses
 
 function BuildNFCeJson(const AEmpresa: TConfereEmpresaInfo;
   const ARecord: TConfereNFCeRecord): TJSONObject;
+function BuildNFeSaidaJson(const AEmpresa: TConfereEmpresaInfo;
+  const ARecord: TConfereNFeSaidaRecord): TJSONObject;
 function BuildLoteJson(const ACNPJ, AInstalacaoID: string;
   const AItems: TArray<TConfereQueueItem>): TJSONObject;
 
@@ -80,6 +82,67 @@ begin
     .AddPair('nome_computador', AEmpresa.NomeComputador)
     .AddPair('hash_incremento', TJSONNumber.Create(ARecord.HashIncremento))
     .AddPair('status_operacional', ConfereStatusToString(ARecord.StatusOperacional)));
+end;
+
+function BuildNFeSaidaJson(const AEmpresa: TConfereEmpresaInfo;
+  const ARecord: TConfereNFeSaidaRecord): TJSONObject;
+begin
+  Result := TJSONObject.Create;
+  Result.AddPair('payload_version', TJSONNumber.Create(1));
+  Result.AddPair('empresa', TJSONObject.Create
+    .AddPair('id_empresa_erp', TJSONNumber.Create(ARecord.IDEmpresa))
+    .AddPair('cnpj', NormalizeDigits(AEmpresa.CNPJ))
+    .AddPair('razao_social', AEmpresa.RazaoSocial)
+    .AddPair('nome_fantasia', AEmpresa.NomeFantasia)
+    .AddPair('inscricao_estadual', NormalizeDigits(AEmpresa.InscricaoEstadual))
+    .AddPair('crt', AEmpresa.CRT)
+    .AddPair('tipo_regime', AEmpresa.TipoRegime)
+    .AddPair('cidade', AEmpresa.Cidade)
+    .AddPair('uf', AEmpresa.UF)
+    .AddPair('nome_computador', AEmpresa.NomeComputador));
+
+  Result.AddPair('nota', TJSONObject.Create
+    .AddPair('source_id', TJSONNumber.Create(ARecord.SourceID))
+    .AddPair('id_empresa', TJSONNumber.Create(ARecord.IDEmpresa))
+    .AddPair('numero_nota', TJSONNumber.Create(ARecord.NumeroNota))
+    .AddPair('serie_nota_fiscal', TJSONNumber.Create(ARecord.SerieNotaFiscal))
+    .AddPair('serie_nota', ARecord.SerieNota)
+    .AddPair('codigo_modelo', TJSONNumber.Create(ARecord.CodigoModelo))
+    .AddPair('tipo_nota', TJSONNumber.Create(ARecord.TipoNota))
+    .AddPair('data_emissao', JsonDateOrNull(ARecord.DataEmissao))
+    .AddPair('data_saida', JsonDateOrNull(ARecord.DataSaida))
+    .AddPair('hora_saida', ARecord.HoraSaida)
+    .AddPair('chave_acesso', ARecord.ChaveAcesso)
+    .AddPair('protocolo', ARecord.Protocolo)
+    .AddPair('status_cancelado', ARecord.StatusCancelado)
+    .AddPair('status_transmitida', ARecord.StatusTransmitida)
+    .AddPair('status_retorno', ARecord.StatusRetorno)
+    .AddPair('cancelada_nf', ARecord.CanceladaNF)
+    .AddPair('valor_total', JsonNumberOrZero(ARecord.ValorTotal))
+    .AddPair('valor_produtos', JsonNumberOrZero(ARecord.ValorProdutos))
+    .AddPair('desconto', JsonNumberOrZero(ARecord.Desconto))
+    .AddPair('valor_frete', JsonNumberOrZero(ARecord.ValorFrete))
+    .AddPair('valor_seguro', JsonNumberOrZero(ARecord.ValorSeguro))
+    .AddPair('outras_despesas', JsonNumberOrZero(ARecord.OutrasDespesas))
+    .AddPair('valor_outro', JsonNumberOrZero(ARecord.ValorOutro))
+    .AddPair('base_icms', JsonNumberOrZero(ARecord.BaseICMS))
+    .AddPair('valor_icms', JsonNumberOrZero(ARecord.ValorICMS))
+    .AddPair('base_st', JsonNumberOrZero(ARecord.BaseST))
+    .AddPair('valor_st', JsonNumberOrZero(ARecord.ValorST))
+    .AddPair('valor_ipi', JsonNumberOrZero(ARecord.ValorIPI))
+    .AddPair('valor_pis', JsonNumberOrZero(ARecord.ValorPIS))
+    .AddPair('valor_cofins', JsonNumberOrZero(ARecord.ValorCOFINS))
+    .AddPair('valor_pis_st', JsonNumberOrZero(ARecord.ValorPISST))
+    .AddPair('valor_cofins_st', JsonNumberOrZero(ARecord.ValorCOFINSST))
+    .AddPair('recibo', ARecord.Recibo)
+    .AddPair('web', ARecord.Web)
+    .AddPair('tipo_pagamento', TJSONNumber.Create(ARecord.TipoPagamento))
+    .AddPair('codigo_numerico', TJSONNumber.Create(ARecord.CodigoNumerico))
+    .AddPair('documento_cliente', NormalizeDigits(ARecord.DocumentoCliente))
+    .AddPair('xml_presente', TJSONBool.Create(ARecord.XMLPresent))
+    .AddPair('nome_computador', AEmpresa.NomeComputador)
+    .AddPair('hash_incremento', TJSONNumber.Create(ARecord.HashIncremento))
+    .AddPair('status_operacional', ARecord.StatusOperacional));
 end;
 
 function BuildLoteJson(const ACNPJ, AInstalacaoID: string;

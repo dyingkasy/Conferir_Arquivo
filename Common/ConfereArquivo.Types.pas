@@ -6,7 +6,7 @@ uses
   System.SysUtils;
 
 const
-  CONFERE_SYNC_REVISION = 3;
+  CONFERE_SYNC_REVISION = 4;
 
 type
   TConfereNFCeStatus = (
@@ -35,6 +35,49 @@ type
     NFCeOff: string;
     DesativarTransmissao: string;
     NomeComputador: string;
+  end;
+
+  TConfereNFeSaidaRecord = record
+    SourceID: Integer;
+    IDEmpresa: Integer;
+    NumeroNota: Integer;
+    SerieNotaFiscal: Integer;
+    SerieNota: string;
+    CodigoModelo: Integer;
+    TipoNota: Integer;
+    DataEmissao: TDateTime;
+    DataSaida: TDateTime;
+    HoraSaida: string;
+    ChaveAcesso: string;
+    Protocolo: string;
+    StatusCancelado: string;
+    StatusTransmitida: string;
+    StatusRetorno: string;
+    CanceladaNF: string;
+    ValorTotal: Currency;
+    ValorProdutos: Currency;
+    Desconto: Currency;
+    ValorFrete: Currency;
+    ValorSeguro: Currency;
+    OutrasDespesas: Currency;
+    ValorOutro: Currency;
+    BaseICMS: Currency;
+    ValorICMS: Currency;
+    BaseST: Currency;
+    ValorST: Currency;
+    ValorIPI: Currency;
+    ValorPIS: Currency;
+    ValorCOFINS: Currency;
+    ValorPISST: Currency;
+    ValorCOFINSST: Currency;
+    Recibo: string;
+    Web: string;
+    TipoPagamento: Integer;
+    CodigoNumerico: Integer;
+    DocumentoCliente: string;
+    XMLPresent: Boolean;
+    HashIncremento: Integer;
+    StatusOperacional: string;
   end;
 
   TConfereNFCeRecord = record
@@ -84,6 +127,7 @@ type
 
 function ConfereStatusToString(const AStatus: TConfereNFCeStatus): string;
 function ConfereStatusFromRecord(const ARecord: TConfereNFCeRecord): TConfereNFCeStatus;
+function ConfereNFeSaidaStatusFromRecord(const ARecord: TConfereNFeSaidaRecord): string;
 function NormalizeDigits(const AValue: string): string;
 
 implementation
@@ -157,6 +201,17 @@ begin
     Exit(nsPendenteTransmissao);
 
   Result := nsIgnorada;
+end;
+
+function ConfereNFeSaidaStatusFromRecord(const ARecord: TConfereNFeSaidaRecord): string;
+begin
+  if SameText(Trim(ARecord.StatusCancelado), 'S') then
+    Exit('CANCELADA');
+
+  if Trim(ARecord.Protocolo) <> '' then
+    Exit('AUTORIZADA');
+
+  Result := 'NAO_AUTORIZADA';
 end;
 
 end.

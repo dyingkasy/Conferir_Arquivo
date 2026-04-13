@@ -134,6 +134,37 @@ func (h *Handler) Lote(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) NFeSaidaLote(w http.ResponseWriter, r *http.Request) {
+	var req model.LoteRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	token := auth.BearerToken(r.Header.Get("Authorization"))
+	if model.NormalizeDigits(req.CNPJEmpresa) == "" || token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cnpj_empresa and bearer token are required"})
+		return
+	}
+
+	if err := h.store.SaveNFeSaidaLote(r.Context(), req, token, remoteIP(r)); err != nil {
+		if errors.Is(err, store.ErrUnauthorized) {
+			h.writeAuthError(w, err)
+			return
+		}
+
+		h.logger.Error("failed to persist nfe saida lote", "error", err)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "ok",
+		"mensagem":   "Lote NFe Saida recebido e persistido.",
+		"quantidade": req.Quantidade,
+	})
+}
+
 func (h *Handler) Empresas(w http.ResponseWriter, r *http.Request) {
 	token := auth.BearerToken(r.Header.Get("Authorization"))
 	if token == "" {

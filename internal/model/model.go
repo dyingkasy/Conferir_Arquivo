@@ -7,9 +7,10 @@ import (
 )
 
 type ConfigCheckRequest struct {
-	CNPJEmpresa  string `json:"cnpj_empresa"`
-	RazaoSocial  string `json:"razao_social"`
-	InstalacaoID string `json:"instalacao_id"`
+	CNPJEmpresa    string `json:"cnpj_empresa"`
+	RazaoSocial    string `json:"razao_social"`
+	InstalacaoID   string `json:"instalacao_id"`
+	NomeComputador string `json:"nome_computador"`
 }
 
 type HeartbeatRequest struct {
@@ -132,6 +133,60 @@ type NFCeEspelhoRow struct {
 	StatusOperacional  string
 	PayloadJSON        []byte
 	RemoteIP           string
+}
+
+type NFeSaidaPayload struct {
+	Empresa           map[string]any `json:"empresa"`
+	Nota              map[string]any `json:"nota"`
+	StatusOperacional string         `json:"status_operacional"`
+}
+
+type NFeSaidaEspelhoRow struct {
+	CNPJEmpresa       string
+	SourceID          int32
+	InstalacaoID      string
+	NomeComputador    string
+	IDEmpresa         *int32
+	NumeroNota        *int32
+	SerieNotaFiscal   *int32
+	SerieNota         string
+	CodigoModelo      *int32
+	TipoNota          *int32
+	DataEmissao       *time.Time
+	DataSaida         *time.Time
+	HoraSaida         string
+	ChaveAcesso       string
+	Protocolo         string
+	StatusCancelado   string
+	StatusTransmitida string
+	StatusRetorno     string
+	CanceladaNF       string
+	ValorTotal        *float64
+	ValorProdutos     *float64
+	Desconto          *float64
+	ValorFrete        *float64
+	ValorSeguro       *float64
+	OutrasDespesas    *float64
+	ValorOutro        *float64
+	BaseICMS          *float64
+	ValorICMS         *float64
+	BaseST            *float64
+	ValorST           *float64
+	ValorIPI          *float64
+	ValorPIS          *float64
+	ValorCOFINS       *float64
+	ValorPISST        *float64
+	ValorCOFINSST     *float64
+	Recibo            string
+	Web               string
+	TipoPagamento     *int32
+	CodigoNumerico    *int32
+	DocumentoCliente  string
+	XMLPresente       bool
+	HashIncremento    *int32
+	StatusOperacional string
+	PayloadJSON       []byte
+	RemoteIP          string
 }
 
 func NormalizeDigits(value string) string {

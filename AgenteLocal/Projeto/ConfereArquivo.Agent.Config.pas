@@ -8,11 +8,16 @@ uses
 type
   TConfereAgentConfig = record
     AppRoot: string;
+    ExeRoot: string;
     ConfigFileName: string;
     LogPath: string;
     QueueDatabasePath: string;
     SourceDatabasePath: string;
     SourceDatabasePaths: TStringDynArray;
+    NFCeDatabasePath: string;
+    NFCeDatabasePaths: TStringDynArray;
+    NFeSaidaDatabasePath: string;
+    NFeSaidaDatabasePaths: TStringDynArray;
     FirebirdUser: string;
     FirebirdPassword: string;
     ApiBaseUrl: string;
@@ -41,6 +46,11 @@ begin
   Result := ExcludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
   if SameText(ExtractFileName(Result), 'Bin') then
     Result := ExpandFileName(IncludeTrailingPathDelimiter(Result) + '..');
+end;
+
+function ExeRootPath: string;
+begin
+  Result := ExcludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
 end;
 
 procedure EnsureDirectory(const APath: string);
@@ -84,20 +94,32 @@ begin
   end;
 end;
 
-function LoadDatabasePaths(const AIni: TIniFile): TStringDynArray;
+function LoadSectionDatabasePaths(const AIni: TIniFile; const ASection: string): TStringDynArray;
 var
   Count, I: Integer;
   Value: string;
   L: TStringDynArray;
 begin
-  Count := AIni.ReadInteger('Bancos', 'Count', 0);
+  Count := AIni.ReadInteger(ASection, 'Count', 0);
   if Count > 0 then
   begin
     SetLength(L, Count);
     for I := 0 to Count - 1 do
-      L[I] := Trim(AIni.ReadString('Bancos', Format('Database%d', [I + 1]), ''));
+      L[I] := Trim(AIni.ReadString(ASection, Format('Database%d', [I + 1]), ''));
     Exit(FilterDatabasePaths(L));
   end;
+
+  SetLength(Result, 0);
+end;
+
+function LoadLegacyDatabasePaths(const AIni: TIniFile): TStringDynArray;
+var
+  Value: string;
+  L: TStringDynArray;
+begin
+  Result := LoadSectionDatabasePaths(AIni, 'Bancos');
+  if Length(Result) > 0 then
+    Exit;
 
   Value := Trim(AIni.ReadString('Banco', 'Database', ''));
   if Value <> '' then
@@ -110,21 +132,69 @@ begin
   SetLength(Result, 0);
 end;
 
-procedure SaveDatabasePaths(const AIni: TIniFile; const APaths: TStringDynArray);
+procedure SaveSectionDatabasePaths(const AIni: TIniFile; const ASection, AFallbackSection, AFallbackKey: string;
+  const APaths: TStringDynArray);
 var
   I: Integer;
   Paths: TStringDynArray;
 begin
   Paths := FilterDatabasePaths(APaths);
-  AIni.EraseSection('Bancos');
-  AIni.WriteInteger('Bancos', 'Count', Length(Paths));
+  AIni.EraseSection(ASection);
+  AIni.WriteInteger(ASection, 'Count', Length(Paths));
   for I := 0 to High(Paths) do
-    AIni.WriteString('Bancos', Format('Database%d', [I + 1]), Paths[I]);
+    AIni.WriteString(ASection, Format('Database%d', [I + 1]), Paths[I]);
 
-  if Length(Paths) > 0 then
-    AIni.WriteString('Banco', 'Database', Paths[0])
+  if AFallbackSection <> '' then
+  begin
+    if Length(Paths) > 0 then
+      AIni.WriteString(AFallbackSection, AFallbackKey, Paths[0])
+    else
+      AIni.WriteString(AFallbackSection, AFallbackKey, '');
+  end;
+end;
+
+function ReadDiscoveredPath(const AConfigFile, ASection, AKey: string): string;
+var
+  Ini: TIniFile;
+begin
+  Result := '';
+  if not FileExists(AConfigFile) then
+    Exit;
+
+  Ini := TIniFile.Create(AConfigFile);
+  try
+    Result := Trim(Ini.ReadString(ASection, AKey, ''));
+    if Result <> '' then
+      Result := ExpandFileName(Result);
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure ApplyDiscoveredPath(var APaths: TStringDynArray; const ADiscoveredPath: string);
+var
+  L: TStringDynArray;
+begin
+  if (Length(APaths) > 0) and FileExists(APaths[0]) then
+    Exit;
+
+  if (ADiscoveredPath = '') or (not FileExists(ADiscoveredPath)) then
+    Exit;
+
+  SetLength(L, 1);
+  L[0] := ADiscoveredPath;
+  APaths := FilterDatabasePaths(L);
+end;
+
+function SinglePathArray(const AValue: string): TStringDynArray;
+begin
+  if Trim(AValue) = '' then
+    SetLength(Result, 0)
   else
-    AIni.WriteString('Banco', 'Database', '');
+  begin
+    SetLength(Result, 1);
+    Result[0] := Trim(AValue);
+  end;
 end;
 
 function CurrentStartupEnabled: Boolean;
@@ -174,9 +244,12 @@ begin
 
   Ini := TIniFile.Create(AFileName);
   try
+    Ini.WriteInteger('NFCe', 'Count', 1);
+    Ini.WriteString('NFCe', 'Database1', ExpandFileName('C:\DEV\Confere_Arquivo\PAFECF.FDB'));
+    Ini.WriteInteger('NFeSaida', 'Count', 1);
+    Ini.WriteString('NFeSaida', 'Database1', ExpandFileName('C:\DEV\Confere_Arquivo\BANCO.GDB'));
     Ini.WriteString('Banco', 'Database', ExpandFileName('C:\DEV\Confere_Arquivo\PAFECF.FDB'));
-    Ini.WriteInteger('Bancos', 'Count', 1);
-    Ini.WriteString('Bancos', 'Database1', ExpandFileName('C:\DEV\Confere_Arquivo\PAFECF.FDB'));
+    Ini.WriteString('Banco', 'DatabaseNFeSaida', ExpandFileName('C:\DEV\Confere_Arquivo\BANCO.GDB'));
     Ini.WriteString('Banco', 'User_Name', 'SYSDBA');
     Ini.WriteString('Banco', 'Password', 'masterkey');
     Ini.WriteString('Servidor', 'BaseUrl', 'http://qualifazentregas.vps-kinghost.net');
@@ -197,6 +270,7 @@ var
 begin
   FillChar(AConfig, SizeOf(AConfig), 0);
   AConfig.AppRoot := AppRootPath;
+  AConfig.ExeRoot := ExeRootPath;
   AConfig.ConfigFileName := IncludeTrailingPathDelimiter(AConfig.AppRoot) + 'Config\ConfereArquivo.ini';
   AConfig.LogPath := IncludeTrailingPathDelimiter(AConfig.AppRoot) + 'Logs';
   AConfig.QueueDatabasePath := IncludeTrailingPathDelimiter(AConfig.AppRoot) + 'Config\ConfereArquivoQueue.sqlite';
@@ -207,11 +281,32 @@ begin
 
   Ini := TIniFile.Create(AConfig.ConfigFileName);
   try
-    AConfig.SourceDatabasePaths := LoadDatabasePaths(Ini);
-    if Length(AConfig.SourceDatabasePaths) > 0 then
-      AConfig.SourceDatabasePath := AConfig.SourceDatabasePaths[0]
+    AConfig.NFCeDatabasePaths := LoadSectionDatabasePaths(Ini, 'NFCe');
+    if Length(AConfig.NFCeDatabasePaths) = 0 then
+      AConfig.NFCeDatabasePaths := LoadLegacyDatabasePaths(Ini);
+
+    AConfig.NFeSaidaDatabasePaths := LoadSectionDatabasePaths(Ini, 'NFeSaida');
+    if Length(AConfig.NFeSaidaDatabasePaths) = 0 then
+      AConfig.NFeSaidaDatabasePaths := FilterDatabasePaths(
+        SinglePathArray(Trim(Ini.ReadString('Banco', 'DatabaseNFeSaida', ''))));
+
+    ApplyDiscoveredPath(AConfig.NFCeDatabasePaths,
+      ReadDiscoveredPath(IncludeTrailingPathDelimiter(AConfig.ExeRoot) + 'ConfigNFCe.ini', 'BANCO', 'LOCAL'));
+    ApplyDiscoveredPath(AConfig.NFeSaidaDatabasePaths,
+      ReadDiscoveredPath(IncludeTrailingPathDelimiter(AConfig.ExeRoot) + 'ConfigLocal.ini', 'ConfiguracaoLocal', 'database'));
+
+    if Length(AConfig.NFCeDatabasePaths) > 0 then
+      AConfig.NFCeDatabasePath := AConfig.NFCeDatabasePaths[0]
     else
-      AConfig.SourceDatabasePath := '';
+      AConfig.NFCeDatabasePath := '';
+
+    if Length(AConfig.NFeSaidaDatabasePaths) > 0 then
+      AConfig.NFeSaidaDatabasePath := AConfig.NFeSaidaDatabasePaths[0]
+    else
+      AConfig.NFeSaidaDatabasePath := '';
+
+    AConfig.SourceDatabasePaths := AConfig.NFCeDatabasePaths;
+    AConfig.SourceDatabasePath := AConfig.NFCeDatabasePath;
     AConfig.FirebirdUser := Trim(Ini.ReadString('Banco', 'User_Name', 'SYSDBA'));
     AConfig.FirebirdPassword := Trim(Ini.ReadString('Banco', 'Password', 'masterkey'));
     AConfig.ApiBaseUrl := Trim(Ini.ReadString('Servidor', 'BaseUrl', ''));
@@ -239,7 +334,8 @@ begin
   EnsureDefaultIni(AConfig.ConfigFileName);
   Ini := TIniFile.Create(AConfig.ConfigFileName);
   try
-    SaveDatabasePaths(Ini, AConfig.SourceDatabasePaths);
+    SaveSectionDatabasePaths(Ini, 'NFCe', 'Banco', 'Database', AConfig.NFCeDatabasePaths);
+    SaveSectionDatabasePaths(Ini, 'NFeSaida', 'Banco', 'DatabaseNFeSaida', AConfig.NFeSaidaDatabasePaths);
     Ini.WriteString('Banco', 'User_Name', AConfig.FirebirdUser);
     Ini.WriteString('Banco', 'Password', AConfig.FirebirdPassword);
     Ini.WriteString('Servidor', 'BaseUrl', AConfig.ApiBaseUrl);

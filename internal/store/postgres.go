@@ -206,6 +206,63 @@ func (p *Postgres) SaveLote(ctx context.Context, lote model.LoteRequest, token, 
 	return tx.Commit(ctx)
 }
 
+func (p *Postgres) SaveNFeSaidaLote(ctx context.Context, lote model.LoteRequest, token, remoteIP string) error {
+	cnpj := model.NormalizeDigits(lote.CNPJEmpresa)
+	instalacaoID := strings.TrimSpace(lote.InstalacaoID)
+	if cnpj == "" || instalacaoID == "" {
+		return errors.New("cnpj_empresa and instalacao_id are required")
+	}
+	if len(lote.Notas) == 0 {
+		return errors.New("notas is required")
+	}
+
+	if _, err := p.EnsureTenantToken(ctx, cnpj, token, ""); err != nil {
+		return err
+	}
+
+	rawPayload, err := json.Marshal(lote)
+	if err != nil {
+		return err
+	}
+
+	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if err := p.saveHeartbeatTx(ctx, tx, cnpj, instalacaoID, lote.NomeComputador, remoteIP); err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `
+		insert into nfe_saida_sync_lote (
+			cnpj_empresa,
+			instalacao_id,
+			quantidade,
+			remote_ip,
+			raw_json,
+			gerado_em,
+			created_at
+		) values ($1, $2, $3, $4, $5::jsonb, $6, now())
+	`, cnpj, instalacaoID, lote.Quantidade, trimRemoteIP(remoteIP), string(rawPayload), parseTimestamp(lote.GeradoEm))
+	if err != nil {
+		return err
+	}
+
+	for _, rawNota := range lote.Notas {
+		row, err := buildNFeSaidaEspelhoRow(cnpj, instalacaoID, rawNota, remoteIP)
+		if err != nil {
+			return err
+		}
+		if err := p.upsertNFeSaidaEspelho(ctx, tx, row); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (p *Postgres) GetResumo(ctx context.Context, cnpj, token, dataInicial, dataFinal, serie, nomeComputador string, dias int) (model.ResumoResponse, error) {
 	if dias <= 0 {
 		dias = 7
@@ -623,6 +680,80 @@ func (p *Postgres) upsertEspelho(ctx context.Context, tx pgx.Tx, row model.NFCeE
 	return err
 }
 
+func (p *Postgres) upsertNFeSaidaEspelho(ctx context.Context, tx pgx.Tx, row model.NFeSaidaEspelhoRow) error {
+	_, err := tx.Exec(ctx, `
+		insert into nfe_saida_cabecalho_espelho (
+			cnpj_empresa, source_id, instalacao_id, nome_computador, id_empresa, numero_nota,
+			serie_nota_fiscal, serie_nota, codigo_modelo, tipo_nota, data_emissao, data_saida,
+			hora_saida, chave_acesso, protocolo, status_cancelado, status_transmitida,
+			status_retorno, cancelada_nf, valor_total, valor_produtos, desconto, valor_frete,
+			valor_seguro, outras_despesas, valor_outro, base_icms, valor_icms, base_st,
+			valor_st, valor_ipi, valor_pis, valor_cofins, valor_pis_st, valor_cofins_st,
+			recibo, web, tipo_pagamento, codigo_numerico, documento_cliente, xml_presente,
+			hash_incremento, status_operacional, payload_json, remote_ip, updated_at, created_at
+		) values (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+			$21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+			$31, $32, $33, $34, $35, $36, $37, $38, $39, $40,
+			$41, $42, $43, $44::jsonb, $45, now(), now()
+		)
+		on conflict (cnpj_empresa, source_id) do update set
+			instalacao_id = excluded.instalacao_id,
+			nome_computador = excluded.nome_computador,
+			id_empresa = excluded.id_empresa,
+			numero_nota = excluded.numero_nota,
+			serie_nota_fiscal = excluded.serie_nota_fiscal,
+			serie_nota = excluded.serie_nota,
+			codigo_modelo = excluded.codigo_modelo,
+			tipo_nota = excluded.tipo_nota,
+			data_emissao = excluded.data_emissao,
+			data_saida = excluded.data_saida,
+			hora_saida = excluded.hora_saida,
+			chave_acesso = excluded.chave_acesso,
+			protocolo = excluded.protocolo,
+			status_cancelado = excluded.status_cancelado,
+			status_transmitida = excluded.status_transmitida,
+			status_retorno = excluded.status_retorno,
+			cancelada_nf = excluded.cancelada_nf,
+			valor_total = excluded.valor_total,
+			valor_produtos = excluded.valor_produtos,
+			desconto = excluded.desconto,
+			valor_frete = excluded.valor_frete,
+			valor_seguro = excluded.valor_seguro,
+			outras_despesas = excluded.outras_despesas,
+			valor_outro = excluded.valor_outro,
+			base_icms = excluded.base_icms,
+			valor_icms = excluded.valor_icms,
+			base_st = excluded.base_st,
+			valor_st = excluded.valor_st,
+			valor_ipi = excluded.valor_ipi,
+			valor_pis = excluded.valor_pis,
+			valor_cofins = excluded.valor_cofins,
+			valor_pis_st = excluded.valor_pis_st,
+			valor_cofins_st = excluded.valor_cofins_st,
+			recibo = excluded.recibo,
+			web = excluded.web,
+			tipo_pagamento = excluded.tipo_pagamento,
+			codigo_numerico = excluded.codigo_numerico,
+			documento_cliente = excluded.documento_cliente,
+			xml_presente = excluded.xml_presente,
+			hash_incremento = excluded.hash_incremento,
+			status_operacional = excluded.status_operacional,
+			payload_json = excluded.payload_json,
+			remote_ip = excluded.remote_ip,
+			updated_at = now()
+	`, row.CNPJEmpresa, row.SourceID, row.InstalacaoID, row.NomeComputador, row.IDEmpresa, row.NumeroNota,
+		row.SerieNotaFiscal, row.SerieNota, row.CodigoModelo, row.TipoNota, row.DataEmissao, row.DataSaida,
+		row.HoraSaida, row.ChaveAcesso, row.Protocolo, row.StatusCancelado, row.StatusTransmitida,
+		row.StatusRetorno, row.CanceladaNF, row.ValorTotal, row.ValorProdutos, row.Desconto, row.ValorFrete,
+		row.ValorSeguro, row.OutrasDespesas, row.ValorOutro, row.BaseICMS, row.ValorICMS, row.BaseST,
+		row.ValorST, row.ValorIPI, row.ValorPIS, row.ValorCOFINS, row.ValorPISST, row.ValorCOFINSST,
+		row.Recibo, row.Web, row.TipoPagamento, row.CodigoNumerico, row.DocumentoCliente, row.XMLPresente,
+		row.HashIncremento, row.StatusOperacional, string(row.PayloadJSON), trimRemoteIP(row.RemoteIP))
+	return err
+}
+
 func buildEspelhoRow(cnpj, instalacaoID string, rawNota []byte, remoteIP string) (model.NFCeEspelhoRow, error) {
 	var nota model.NotaPayload
 	if err := json.Unmarshal(rawNota, &nota); err != nil {
@@ -711,6 +842,116 @@ func buildEspelhoRow(cnpj, instalacaoID string, rawNota []byte, remoteIP string)
 	row.StatusOperacional = normalizeIncomingStatus(nota.StatusOperacional)
 	if row.StatusOperacional == "" {
 		row.StatusOperacional = classifyStatus(row)
+	}
+
+	return row, nil
+}
+
+func buildNFeSaidaEspelhoRow(cnpj, instalacaoID string, rawNota []byte, remoteIP string) (model.NFeSaidaEspelhoRow, error) {
+	var nota model.NFeSaidaPayload
+	if err := json.Unmarshal(rawNota, &nota); err != nil {
+		return model.NFeSaidaEspelhoRow{}, fmt.Errorf("invalid nfe payload: %w", err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(rawNota, &root); err != nil {
+		return model.NFeSaidaEspelhoRow{}, fmt.Errorf("invalid nfe root payload: %w", err)
+	}
+	nf := nota.Nota
+	if nf == nil {
+		return model.NFeSaidaEspelhoRow{}, errors.New("nota sem objeto nota")
+	}
+
+	sourceID, ok := getInt32(nf, "source_id")
+	if !ok || sourceID <= 0 {
+		return model.NFeSaidaEspelhoRow{}, errors.New("source_id is required")
+	}
+
+	row := model.NFeSaidaEspelhoRow{
+		CNPJEmpresa:       cnpj,
+		SourceID:          sourceID,
+		InstalacaoID:      instalacaoID,
+		NomeComputador:    firstNonEmpty(getString(nf, "nome_computador"), getStringMap(root, "nome_computador")),
+		SerieNota:         getString(nf, "serie_nota"),
+		HoraSaida:         getString(nf, "hora_saida"),
+		ChaveAcesso:       getString(nf, "chave_acesso"),
+		Protocolo:         getString(nf, "protocolo"),
+		StatusCancelado:   getString(nf, "status_cancelado"),
+		StatusTransmitida: getString(nf, "status_transmitida"),
+		StatusRetorno:     getString(nf, "status_retorno"),
+		CanceladaNF:       getString(nf, "cancelada_nf"),
+		Recibo:            getString(nf, "recibo"),
+		Web:               getString(nf, "web"),
+		DocumentoCliente:  getString(nf, "documento_cliente"),
+		PayloadJSON:       rawNota,
+		RemoteIP:          remoteIP,
+	}
+
+	if value, ok := getInt32(nf, "id_empresa"); ok {
+		row.IDEmpresa = &value
+	}
+	if value, ok := getInt32(nf, "numero_nota"); ok {
+		row.NumeroNota = &value
+	}
+	if value, ok := getInt32(nf, "serie_nota_fiscal"); ok {
+		row.SerieNotaFiscal = &value
+	}
+	if value, ok := getInt32(nf, "codigo_modelo"); ok {
+		row.CodigoModelo = &value
+	}
+	if value, ok := getInt32(nf, "tipo_nota"); ok {
+		row.TipoNota = &value
+	}
+	if value, ok := getInt32(nf, "tipo_pagamento"); ok {
+		row.TipoPagamento = &value
+	}
+	if value, ok := getInt32(nf, "codigo_numerico"); ok {
+		row.CodigoNumerico = &value
+	}
+	if value, ok := getInt32(nf, "hash_incremento"); ok {
+		row.HashIncremento = &value
+	}
+	if value, ok := parseDate(getString(nf, "data_emissao")); ok {
+		row.DataEmissao = &value
+	}
+	if value, ok := parseDate(getString(nf, "data_saida")); ok {
+		row.DataSaida = &value
+	}
+	if boolVal, ok := nf["xml_presente"].(bool); ok {
+		row.XMLPresente = boolVal
+	}
+
+	for key, target := range map[string]**float64{
+		"valor_total":      &row.ValorTotal,
+		"valor_produtos":   &row.ValorProdutos,
+		"desconto":         &row.Desconto,
+		"valor_frete":      &row.ValorFrete,
+		"valor_seguro":     &row.ValorSeguro,
+		"outras_despesas":  &row.OutrasDespesas,
+		"valor_outro":      &row.ValorOutro,
+		"base_icms":        &row.BaseICMS,
+		"valor_icms":       &row.ValorICMS,
+		"base_st":          &row.BaseST,
+		"valor_st":         &row.ValorST,
+		"valor_ipi":        &row.ValorIPI,
+		"valor_pis":        &row.ValorPIS,
+		"valor_cofins":     &row.ValorCOFINS,
+		"valor_pis_st":     &row.ValorPISST,
+		"valor_cofins_st":  &row.ValorCOFINSST,
+	} {
+		if value, ok := getFloat64(nf, key); ok {
+			*target = &value
+		}
+	}
+
+	row.StatusOperacional = strings.ToUpper(strings.TrimSpace(nota.StatusOperacional))
+	if row.StatusOperacional == "" {
+		if strings.EqualFold(strings.TrimSpace(row.StatusCancelado), "S") {
+			row.StatusOperacional = "CANCELADA"
+		} else if strings.TrimSpace(row.Protocolo) <> "" {
+			row.StatusOperacional = "AUTORIZADA"
+		} else {
+			row.StatusOperacional = "NAO_AUTORIZADA"
+		}
 	}
 
 	return row, nil

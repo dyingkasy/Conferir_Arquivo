@@ -44,7 +44,7 @@ object FrmConfereArquivoOfficeMain: TFrmConfereArquivoOfficeMain
       Top = 37
       Width = 511
       Height = 15
-      Caption = 'Conferencia de NFC-e transmitidas, contingencia, sem fiscal e totais por empresa.'
+      Caption = 'Consulta atual: somente NFC-e. NFe Saida sera exibida em tela separada na proxima etapa.'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = 15724527
       Font.Height = -12

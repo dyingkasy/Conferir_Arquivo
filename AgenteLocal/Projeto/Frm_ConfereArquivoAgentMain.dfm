@@ -2,7 +2,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
   Left = 0
   Top = 0
   Caption = 'Confere Arquivo - Agente Local'
-  ClientHeight = 700
+  ClientHeight = 760
   ClientWidth = 1060
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -46,7 +46,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
       Top = 53
       Width = 571
       Height = 17
-      Caption = 'Escopo atual: somente NFC-e. Coleta do PAFECF e envio do espelho fiscal para a API da VPS.'
+      Caption = 'Painel ainda consulta somente NFC-e. Nesta etapa o agente coleta NFC-e e NFe Saida e envia os dois espelhos para a VPS.'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = 15724527
       Font.Height = -13
@@ -59,52 +59,67 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
     Left = 16
     Top = 104
     Width = 510
-    Height = 184
+    Height = 246
     Caption = 'Origem Firebird'
     TabOrder = 1
-    object lblBanco: TLabel
+    object lblBancoNFCe: TLabel
       Left = 16
       Top = 33
-      Width = 170
+      Width = 141
       Height = 17
-      Caption = 'Bancos PAFECF / 1 caminho por linha'
+      Caption = 'NFC-e / 1 caminho por linha'
+    end
+    object lblBancoNFeSaida: TLabel
+      Left = 16
+      Top = 117
+      Width = 162
+      Height = 17
+      Caption = 'NFe Saida / 1 caminho por linha'
     end
     object lblUsuario: TLabel
       Left = 16
-      Top = 89
+      Top = 178
       Width = 48
       Height = 17
       Caption = 'Usuario'
     end
     object lblSenha: TLabel
       Left = 265
-      Top = 89
+      Top = 178
       Width = 37
       Height = 17
       Caption = 'Senha'
     end
-    object mmBancos: TMemo
+    object mmBancosNFCe: TMemo
       Left = 16
       Top = 52
       Width = 478
-      Height = 65
+      Height = 57
       ScrollBars = ssVertical
       TabOrder = 0
     end
+    object mmBancosNFeSaida: TMemo
+      Left = 16
+      Top = 136
+      Width = 478
+      Height = 33
+      ScrollBars = ssVertical
+      TabOrder = 1
+    end
     object edUsuario: TEdit
       Left = 16
-      Top = 145
+      Top = 201
       Width = 225
       Height = 25
-      TabOrder = 1
+      TabOrder = 2
     end
     object edSenha: TEdit
       Left = 265
-      Top = 145
+      Top = 201
       Width = 229
       Height = 25
       PasswordChar = '*'
-      TabOrder = 2
+      TabOrder = 3
     end
   end
   object gbServidor: TGroupBox
@@ -159,7 +174,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
   end
   object gbAgente: TGroupBox
     Left = 16
-    Top = 300
+    Top = 362
     Width = 1028
     Height = 116
     Caption = 'Controle do Agente'
@@ -265,7 +280,7 @@ object FrmConfereArquivoAgentMain: TFrmConfereArquivoAgentMain
   end
   object gbMonitor: TGroupBox
     Left = 16
-    Top = 428
+    Top = 490
     Width = 1028
     Height = 256
     Caption = 'Monitor de Operacao'

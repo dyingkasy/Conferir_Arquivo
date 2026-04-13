@@ -23,6 +23,7 @@ create index if not exists idx_tenant_auth_token_lookup
 create table if not exists agente_instalacao (
   instalacao_id varchar(80) primary key,
   cnpj_empresa varchar(14) not null references tenant_empresa(cnpj),
+  nome_computador varchar(120),
   remote_ip varchar(60),
   last_seen_at timestamp not null default current_timestamp,
   created_at timestamp not null default current_timestamp
@@ -50,6 +51,7 @@ create table if not exists nfce_cabecalho_espelho (
   cnpj_empresa varchar(14) not null references tenant_empresa(cnpj),
   source_id integer not null,
   instalacao_id varchar(80),
+  nome_computador varchar(120),
   id_ecf_movimento integer,
   data_venda date,
   hora_venda varchar(8),
@@ -88,3 +90,81 @@ create table if not exists nfce_cabecalho_espelho (
 
 create index if not exists idx_nfce_espelho_cnpj_data
   on nfce_cabecalho_espelho (cnpj_empresa, data_venda desc);
+
+create index if not exists idx_nfce_espelho_cnpj_serie
+  on nfce_cabecalho_espelho (cnpj_empresa, serie_nfce);
+
+create index if not exists idx_nfce_espelho_cnpj_computador
+  on nfce_cabecalho_espelho (cnpj_empresa, nome_computador);
+
+create table if not exists nfe_saida_sync_lote (
+  id bigserial primary key,
+  cnpj_empresa varchar(14) not null references tenant_empresa(cnpj),
+  instalacao_id varchar(80),
+  quantidade integer not null,
+  remote_ip varchar(60),
+  raw_json jsonb not null,
+  gerado_em timestamp null,
+  created_at timestamp not null default current_timestamp
+);
+
+create index if not exists idx_nfe_saida_sync_lote_cnpj_created_at
+  on nfe_saida_sync_lote (cnpj_empresa, created_at desc);
+
+create table if not exists nfe_saida_cabecalho_espelho (
+  id bigserial primary key,
+  cnpj_empresa varchar(14) not null references tenant_empresa(cnpj),
+  source_id integer not null,
+  instalacao_id varchar(80),
+  nome_computador varchar(120),
+  id_empresa integer,
+  numero_nota integer,
+  serie_nota_fiscal integer,
+  serie_nota varchar(10),
+  codigo_modelo integer,
+  tipo_nota integer,
+  data_emissao date,
+  data_saida date,
+  hora_saida varchar(8),
+  chave_acesso varchar(44),
+  protocolo varchar(60),
+  status_cancelado varchar(5),
+  status_transmitida varchar(5),
+  status_retorno varchar(5),
+  cancelada_nf varchar(5),
+  valor_total numeric(18,6),
+  valor_produtos numeric(18,6),
+  desconto numeric(18,6),
+  valor_frete numeric(18,6),
+  valor_seguro numeric(18,6),
+  outras_despesas numeric(18,6),
+  valor_outro numeric(18,6),
+  base_icms numeric(18,6),
+  valor_icms numeric(18,6),
+  base_st numeric(18,6),
+  valor_st numeric(18,6),
+  valor_ipi numeric(18,6),
+  valor_pis numeric(18,6),
+  valor_cofins numeric(18,6),
+  valor_pis_st numeric(18,6),
+  valor_cofins_st numeric(18,6),
+  recibo varchar(60),
+  web varchar(10),
+  tipo_pagamento integer,
+  codigo_numerico integer,
+  documento_cliente varchar(20),
+  xml_presente boolean not null default false,
+  hash_incremento integer,
+  status_operacional varchar(40),
+  payload_json jsonb not null,
+  remote_ip varchar(60),
+  updated_at timestamp not null default current_timestamp,
+  created_at timestamp not null default current_timestamp,
+  constraint uq_nfe_saida_espelho unique(cnpj_empresa, source_id)
+);
+
+create index if not exists idx_nfe_saida_espelho_cnpj_data
+  on nfe_saida_cabecalho_espelho (cnpj_empresa, data_emissao desc);
+
+create index if not exists idx_nfe_saida_espelho_cnpj_numero
+  on nfe_saida_cabecalho_espelho (cnpj_empresa, numero_nota, serie_nota_fiscal);

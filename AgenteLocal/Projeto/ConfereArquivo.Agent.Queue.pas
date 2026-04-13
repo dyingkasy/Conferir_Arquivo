@@ -20,8 +20,9 @@ type
     procedure EnsureSchema;
     function GetStateInt(const AKey: string; ADefault: Integer): Integer;
     procedure SetStateInt(const AKey: string; const AValue: Integer);
-    function ShouldEnqueue(const AItem: TConfereNFCeRecord): Boolean;
-    procedure Enqueue(const AItem: TConfereNFCeRecord; const APayloadJson: string);
+    function ShouldEnqueue(const ASourceID, AHashIncremento: Integer): Boolean;
+    procedure Enqueue(const ASourceID, AHashIncremento: Integer;
+      const AStatusOperacional, APayloadJson: string);
     function GetPending(const ALimit: Integer): TArray<TConfereQueueItem>;
     procedure MarkSent(const AQueueID: Integer);
     procedure MarkFailed(const AQueueID: Integer; const AError: string);
@@ -194,7 +195,7 @@ begin
   end;
 end;
 
-function TConfereAgentQueue.ShouldEnqueue(const AItem: TConfereNFCeRecord): Boolean;
+function TConfereAgentQueue.ShouldEnqueue(const ASourceID, AHashIncremento: Integer): Boolean;
 var
   Q: TFDQuery;
 begin
@@ -204,18 +205,18 @@ begin
   try
     Q.Connection := FConnection;
     Q.SQL.Text := 'select hash_incremento, coalesce(payload_rev, 0) payload_rev from nfce_snapshot where source_id = :id';
-    Q.ParamByName('id').AsInteger := AItem.SourceID;
+    Q.ParamByName('id').AsInteger := ASourceID;
     Q.Open;
     if not Q.IsEmpty then
-      Result := (Q.FieldByName('hash_incremento').AsInteger <> AItem.HashIncremento) or
+      Result := (Q.FieldByName('hash_incremento').AsInteger <> AHashIncremento) or
                 (Q.FieldByName('payload_rev').AsInteger <> CONFERE_SYNC_REVISION);
   finally
     Q.Free;
   end;
 end;
 
-procedure TConfereAgentQueue.Enqueue(const AItem: TConfereNFCeRecord;
-  const APayloadJson: string);
+procedure TConfereAgentQueue.Enqueue(const ASourceID, AHashIncremento: Integer;
+  const AStatusOperacional, APayloadJson: string);
 var
   Q: TFDQuery;
 begin
@@ -227,8 +228,8 @@ begin
     Q.SQL.Text :=
       'insert into outbound_queue(source_id, hash_incremento, payload_json, send_attempts, created_at) ' +
       'values (:source_id, :hash_incremento, :payload_json, 0, :created_at)';
-    Q.ParamByName('source_id').AsInteger := AItem.SourceID;
-    Q.ParamByName('hash_incremento').AsInteger := AItem.HashIncremento;
+    Q.ParamByName('source_id').AsInteger := ASourceID;
+    Q.ParamByName('hash_incremento').AsInteger := AHashIncremento;
     Q.ParamByName('payload_json').AsString := APayloadJson;
     Q.ParamByName('created_at').AsString := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
     Q.ExecSQL;
@@ -236,10 +237,10 @@ begin
     Q.SQL.Text :=
       'insert or replace into nfce_snapshot(source_id, hash_incremento, payload_rev, status_operacional, updated_at) ' +
       'values (:source_id, :hash_incremento, :payload_rev, :status_operacional, :updated_at)';
-    Q.ParamByName('source_id').AsInteger := AItem.SourceID;
-    Q.ParamByName('hash_incremento').AsInteger := AItem.HashIncremento;
+    Q.ParamByName('source_id').AsInteger := ASourceID;
+    Q.ParamByName('hash_incremento').AsInteger := AHashIncremento;
     Q.ParamByName('payload_rev').AsInteger := CONFERE_SYNC_REVISION;
-    Q.ParamByName('status_operacional').AsString := ConfereStatusToString(AItem.StatusOperacional);
+    Q.ParamByName('status_operacional').AsString := AStatusOperacional;
     Q.ParamByName('updated_at').AsString := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
     Q.ExecSQL;
   finally

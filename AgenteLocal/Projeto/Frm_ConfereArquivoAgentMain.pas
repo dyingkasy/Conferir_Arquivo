@@ -13,10 +13,12 @@ type
     lblTitulo: TLabel;
     lblSubtitulo: TLabel;
     gbOrigem: TGroupBox;
-    lblBanco: TLabel;
+    lblBancoNFCe: TLabel;
+    lblBancoNFeSaida: TLabel;
     lblUsuario: TLabel;
     lblSenha: TLabel;
-    mmBancos: TMemo;
+    mmBancosNFCe: TMemo;
+    mmBancosNFeSaida: TMemo;
     edUsuario: TEdit;
     edSenha: TEdit;
     gbServidor: TGroupBox;
@@ -98,7 +100,7 @@ type
     procedure RefreshMonitor;
     procedure RunPoll;
     procedure StartAutomaticSync;
-    function ParseDatabasePaths: TStringDynArray;
+    function ParseMemoPaths(AMemo: TMemo): TStringDynArray;
     function ReadLastOperationalLines: string;
   public
   end;
@@ -130,7 +132,7 @@ begin
 
   StartHidden := FindCmdLineSwitch('tray', ['-', '/'], True);
   if StartHidden then
-    HideToTray('Agente iniciado com o Windows. Sincronizacao automatica NFC-e ativa.');
+    HideToTray('Agente iniciado com o Windows. Coleta automatica ativa para NFC-e e NFe Saida.');
 end;
 
 procedure TFrmConfereArquivoAgentMain.FormDestroy(Sender: TObject);
@@ -300,9 +302,12 @@ procedure TFrmConfereArquivoAgentMain.LoadScreen;
 var
   DatabasePath: string;
 begin
-  mmBancos.Clear;
-  for DatabasePath in FConfig.SourceDatabasePaths do
-    mmBancos.Lines.Add(DatabasePath);
+  mmBancosNFCe.Clear;
+  for DatabasePath in FConfig.NFCeDatabasePaths do
+    mmBancosNFCe.Lines.Add(DatabasePath);
+  mmBancosNFeSaida.Clear;
+  for DatabasePath in FConfig.NFeSaidaDatabasePaths do
+    mmBancosNFeSaida.Lines.Add(DatabasePath);
   edUsuario.Text := FConfig.FirebirdUser;
   edSenha.Text := FConfig.FirebirdPassword;
   edApiUrl.Text := FConfig.ApiBaseUrl;
@@ -321,11 +326,18 @@ end;
 
 procedure TFrmConfereArquivoAgentMain.SaveScreenToConfig;
 begin
-  FConfig.SourceDatabasePaths := ParseDatabasePaths;
-  if Length(FConfig.SourceDatabasePaths) > 0 then
-    FConfig.SourceDatabasePath := FConfig.SourceDatabasePaths[0]
+  FConfig.NFCeDatabasePaths := ParseMemoPaths(mmBancosNFCe);
+  FConfig.NFeSaidaDatabasePaths := ParseMemoPaths(mmBancosNFeSaida);
+  if Length(FConfig.NFCeDatabasePaths) > 0 then
+    FConfig.NFCeDatabasePath := FConfig.NFCeDatabasePaths[0]
   else
-    FConfig.SourceDatabasePath := '';
+    FConfig.NFCeDatabasePath := '';
+  if Length(FConfig.NFeSaidaDatabasePaths) > 0 then
+    FConfig.NFeSaidaDatabasePath := FConfig.NFeSaidaDatabasePaths[0]
+  else
+    FConfig.NFeSaidaDatabasePath := '';
+  FConfig.SourceDatabasePaths := FConfig.NFCeDatabasePaths;
+  FConfig.SourceDatabasePath := FConfig.NFCeDatabasePath;
   FConfig.FirebirdUser := Trim(edUsuario.Text);
   FConfig.FirebirdPassword := edSenha.Text;
   FConfig.ApiBaseUrl := Trim(edApiUrl.Text);
@@ -425,7 +437,7 @@ begin
   ScheduleNextSync;
 end;
 
-function TFrmConfereArquivoAgentMain.ParseDatabasePaths: TStringDynArray;
+function TFrmConfereArquivoAgentMain.ParseMemoPaths(AMemo: TMemo): TStringDynArray;
 var
   I: Integer;
   Value: string;
@@ -435,9 +447,9 @@ begin
   try
     L.CaseSensitive := False;
     L.Duplicates := dupIgnore;
-    for I := 0 to mmBancos.Lines.Count - 1 do
+    for I := 0 to AMemo.Lines.Count - 1 do
     begin
-      Value := Trim(mmBancos.Lines[I]);
+      Value := Trim(AMemo.Lines[I]);
       if Value = '' then
         Continue;
       Value := ExpandFileName(Value);
